@@ -126,6 +126,70 @@ _GENERIC_PERSIST_NUDGE = (
     "guardaste hasta que la tool devuelva el id o los ids."
 )
 
+# Estancamiento genérico: el turno termina con texto que solo anuncia el
+# próximo paso ("voy a...", "ahora voy a...") sin haberlo ejecutado, sin que
+# haya un write reivindicado (eso ya lo cubre should_nudge_persist arriba).
+# Pasa también en tareas de solo lectura/análisis largas (revisar 69
+# registros uno por uno) donde el modelo cumple la tool forzada de la ronda 1
+# con una sola llamada y luego se conforma con describir el resto.
+_ASSISTANT_PROGRESS_STALL = re.compile(
+    r"(?i)(voy a \w+|ahora voy a\b|procedo a \w+|a continuaci[óo]n\b|"
+    r"contin[uú]o (con|revisando|obteniendo|analizando)\b)"
+)
+# Frase del usuario que pide detener/cancelar la tarea en curso — si aparece
+# en el mensaje que disparó este turno, no se fuerza a seguir trabajando.
+_USER_STOP_INTENT = re.compile(
+    r"(?i)\b(det[eé]nte|cancela(r)?|ya no (sigas|contin[uú]es)|no sigas|no contin[uú]es|"
+    r"olv[ií]dalo|d[eé]jalo as[ií]|mejor no lo hagas|para de\b|alto\b)"
+)
+_PROGRESS_STALL_NUDGE = (
+    "Te quedaste anunciando el próximo paso sin ejecutarlo. No lo vuelvas a describir: llama "
+    "ahora mismo la tool correspondiente y termina la tarea completa en este turno (todos los "
+    "registros, no solo el primero). Si necesitas revisar muchos, usa list_career_record con "
+    "limit=100 y pagina con skip mientras has_more sea true; si vas a cambiar varios, usa "
+    "bulk_update_career_record en una sola llamada. Sigue trabajando hasta terminar o hasta que "
+    "de verdad necesites un dato que solo Carlos puede darte."
+)
+
+
+def _has_unstopped_progress_claim(text: str) -> bool:
+    """True si `text` anuncia una acción futura sin negarla justo antes
+    ("no voy a...", "ya no voy a..." no cuentan)."""
+    for m in _ASSISTANT_PROGRESS_STALL.finditer(text):
+        preceding = text[max(0, m.start() - 12):m.start()].lower()
+        if "no " in preceding:
+            continue
+        return True
+    return False
+
+
+def should_nudge_progress(
+    profile_level: int,
+    user_message: str,
+    assistant_text: str,
+    nudges_used: int,
+    max_nudges: int = 2,
+) -> bool:
+    """True cuando el turno terminó en texto que solo anuncia el siguiente
+    paso de una tarea (sin reclamar un write — eso lo cubre
+    should_nudge_persist), el perfil es un L2 con tools reales, no se agotó
+    el cupo de empujones de este turno, y el usuario no pidió detenerse."""
+    if profile_level != 2:
+        return False
+    if nudges_used >= max_nudges:
+        return False
+    if _USER_STOP_INTENT.search(user_message or ""):
+        return False
+    text = (assistant_text or "").strip()
+    if not text:
+        return False
+    tail = text[-300:]
+    if _has_unstopped_progress_claim(tail):
+        return True
+    # Termina en ":" (lista/próximo paso anunciado) y es corto: probablemente
+    # no alcanzó a ejecutar nada después de anunciarlo.
+    return tail.rstrip().endswith(":") and len(text) < 600
+
 
 def persist_nudge_text(profile_id: str) -> str:
     if profile_id == AGENT_PDF_DESIGN:
@@ -438,6 +502,7 @@ async def chat_stream(
     }
     max_rounds = max_round_trips_override or runtime.max_round_trips
     delegations_used = 0
+    progress_nudge_count = 0
     persist_nudge_sent = False
     # Lecturas ya resueltas en este turno: (tool, input) -> resultado ya enviado
     # arriba. Evita reincrustar el mismo registro grande ronda tras ronda.
@@ -498,6 +563,24 @@ async def chat_stream(
                     [
                         {"role": "assistant", "content": assistant_blocks},
                         {"role": "user", "content": [{"text": persist_nudge_text(profile.id)}]},
+                    ]
+                )
+                continue
+            if should_nudge_progress(
+                profile.level, req.message, result.get("text") or "", progress_nudge_count
+            ):
+                progress_nudge_count += 1
+                force_tool_this_round = True
+                yield {"type": "status", "message": "Continuando la tarea..."}
+                assistant_blocks = []
+                if result["text"]:
+                    assistant_blocks.append({"text": result["text"]})
+                if not assistant_blocks:
+                    assistant_blocks.append({"text": "(sin texto)"})
+                messages.extend(
+                    [
+                        {"role": "assistant", "content": assistant_blocks},
+                        {"role": "user", "content": [{"text": _PROGRESS_STALL_NUDGE}]},
                     ]
                 )
                 continue

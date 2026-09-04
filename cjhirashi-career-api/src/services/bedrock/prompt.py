@@ -63,7 +63,11 @@ _L2_DOMAIN_RULE = (
     "Si el cambio toca varios registros del mismo resource_key (ej. reclasificar todas las "
     "competencias en categorías nuevas), NO los anuncies uno por uno en texto: llama "
     "bulk_update_career_record con resource_key y updates=[{record_id, fields}, ...] en el mismo "
-    "turno en que lo confirmas. 'Voy a actualizar cada uno' sin llamar la tool no cuenta como hecho."
+    "turno en que lo confirmas. 'Voy a actualizar cada uno' sin llamar la tool no cuenta como hecho. "
+    "Esto también aplica a tareas de solo lectura o análisis sobre muchos registros: no termines "
+    "el turno diciendo 'ahora voy a revisar/obtener X de cada uno' y te detengas ahí — ejecútalo "
+    "en el mismo turno, ronda tras ronda, hasta terminar el lote completo o hasta que de verdad "
+    "necesites que Carlos decida algo. Anunciar el próximo paso sin darlo no es progreso."
 )
 
 _L3_TASK_RULE = (
