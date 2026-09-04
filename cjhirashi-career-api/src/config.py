@@ -97,6 +97,14 @@ class Settings(BaseSettings):
     BEDROCK_IMAGE_MODEL_ID: str = "amazon.titan-image-generator-v2:0"
     BEDROCK_MAX_IMAGES_PER_DAY: int = 20
     BEDROCK_MAX_TOOL_RESULT_CHARS: int = 8000
+    # inferenceConfig.maxTokens de cada llamada Converse. El default de boto3/
+    # Converse (4096) se corta a mitad de un tool_use grande (p.ej.
+    # bulk_update_career_record con 60+ items): Bedrock descarta el bloque de
+    # contenido incompleto entero, así que el turno vuelve sin texto NI tool
+    # call, indistinguible en la UI de "no hizo nada" (bug real, ver
+    # agent_loop._MAX_TOKENS_TRUNCATION_NUDGE). Los modelos Claude 4.x en
+    # Bedrock soportan 8192 sin headers/beta adicionales.
+    BEDROCK_MAX_OUTPUT_TOKENS: int = 8192
     # Prompt caching de Bedrock (cachePoint). Kill-switch global; solo aplica a
     # modelos con "supports_prompt_cache": True en BEDROCK_AVAILABLE_MODELS.
     BEDROCK_PROMPT_CACHE_ENABLED: bool = True

@@ -81,8 +81,11 @@ _RAW_TOOLS: List[Dict[str, Any]] = [
             "Actualiza VARIOS registros del mismo resource_key en una sola llamada "
             "(ej. reclasificar todas las competencias en 4 categorías). Úsala en vez de "
             "llamar update_career_record una por una cuando el cambio toca varias filas. "
-            "updates es una lista de {record_id, fields}; máximo 200 por llamada. "
-            "Escribirlo en el chat NO guarda nada — llama esta tool."
+            "updates es una lista de {record_id, fields}; máximo 200 por llamada, pero si son "
+            "más de ~25-30 registros o los fields llevan texto largo, mándalos en varias "
+            "llamadas de ~20-25 items cada una (una tras otra, en el mismo turno) en vez de un "
+            "solo payload gigante — evita cortes por límite de tokens de salida a mitad de la "
+            "respuesta. Escribirlo en el chat NO guarda nada — llama esta tool."
         ),
         "schema": {
             "type": "object",

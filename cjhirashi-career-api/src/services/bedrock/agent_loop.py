@@ -151,6 +151,27 @@ _PROGRESS_STALL_NUDGE = (
     "de verdad necesites un dato que solo Carlos puede darte."
 )
 
+# Cuántas veces por turno se reintenta tras un corte por max_tokens antes de
+# rendirse (evita loop infinito si el modelo insiste en un payload gigante).
+_MAX_TOKENS_RETRY_BUDGET = 2
+_MAX_TOKENS_TRUNCATION_NUDGE = (
+    "Tu respuesta anterior se cortó por el límite de tokens de salida antes de terminar — no "
+    "llegó ni texto ni una tool call completa, así que no se perdió ni se guardó nada todavía. "
+    "Repite la misma acción pero en un lote más chico: si iba a ser una sola llamada con muchos "
+    "registros (ej. bulk_update_career_record), pártela en tandas de unos 20-25 items y hazlas "
+    "una tras otra en este mismo turno hasta cubrir todos. No expliques el corte, solo continúa."
+)
+
+
+def should_retry_max_tokens(
+    stop_reason: str, nudges_used: int, max_retries: int = _MAX_TOKENS_RETRY_BUDGET
+) -> bool:
+    """True cuando la ronda se cortó por maxTokens antes de producir texto o una
+    tool_use completa (Bedrock descarta el bloque de contenido a medio terminar
+    entero) y todavía queda cupo de reintentos para este turno. Se llama solo
+    cuando ya se confirmó que `result["tool_uses"]` vino vacío."""
+    return stop_reason == "max_tokens" and nudges_used < max_retries
+
 
 def _has_unstopped_progress_claim(text: str) -> bool:
     """True si `text` anuncia una acción futura sin negarla justo antes
@@ -503,6 +524,7 @@ async def chat_stream(
     max_rounds = max_round_trips_override or runtime.max_round_trips
     delegations_used = 0
     progress_nudge_count = 0
+    max_tokens_nudge_count = 0
     persist_nudge_sent = False
     # Lecturas ya resueltas en este turno: (tool, input) -> resultado ya enviado
     # arriba. Evita reincrustar el mismo registro grande ronda tras ronda.
@@ -521,6 +543,7 @@ async def chat_stream(
                 messages=messages,
                 system_prompt=system_prompt,
                 tools=tool_specs,
+                max_tokens=settings.BEDROCK_MAX_OUTPUT_TOKENS,
                 force_tool_use=force_tool_this_round and bool(tool_specs),
             )
         except BedrockError as e:
@@ -546,8 +569,31 @@ async def chat_stream(
             agent_profile_id=profile.id,
         )
 
-        # 9. Si el modelo NO requiere uso de herramientas (ya tiene respuesta final)
-        if result["stop_reason"] != "tool_use":
+        # 9. Si el modelo no dejó ninguna tool_use utilizable, no tiene respuesta final
+        # todavía (se decide por contenido, no por el string exacto de stop_reason: en
+        # streaming un tool_use puede llegar completo aunque el mensaje se haya cortado
+        # después por max_tokens — ver consume_converse_stream).
+        if not result["tool_uses"]:
+            if should_retry_max_tokens(result["stop_reason"], max_tokens_nudge_count):
+                # La respuesta se cortó a mitad de generación y Bedrock descartó el
+                # bloque incompleto entero (sin texto NI tool call) — el síntoma es
+                # indistinguible de "no hizo nada". Reintentar más chico en vez de
+                # devolver un turno vacío al usuario.
+                max_tokens_nudge_count += 1
+                force_tool_this_round = True
+                yield {"type": "status", "message": "La respuesta se cortó por límite de tokens; reintentando en tandas más pequeñas..."}
+                assistant_blocks: List[Dict[str, Any]] = []
+                if result["text"]:
+                    assistant_blocks.append({"text": result["text"]})
+                if not assistant_blocks:
+                    assistant_blocks.append({"text": "(sin texto)"})
+                messages.extend(
+                    [
+                        {"role": "assistant", "content": assistant_blocks},
+                        {"role": "user", "content": [{"text": _MAX_TOKENS_TRUNCATION_NUDGE}]},
+                    ]
+                )
+                continue
             if should_nudge_persist(
                 profile.id, req.message, affected, persist_nudge_sent, result.get("text") or ""
             ):
