@@ -199,8 +199,16 @@ _LIST_LABEL_FIELDS = ("title", "name", "company", "exact_role", "role_name", "ta
 _LIST_SUMMARY_FIELDS = ("context", "challenge", "status", "evaluation", "card_summary", "excerpt")
 
 
-def _serialize_list_item(obj: Any) -> Dict[str, Any]:
-    """Vista compacta para listados — evita truncar resultados grandes."""
+def _serialize_list_item(obj: Any, extra_fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Vista compacta para listados — evita truncar resultados grandes.
+
+    extra_fields agrega columnas puntuales (ej. `nivel`) a cada item de la
+    lista. Sin esto, revisar un campo en todos los registros de un recurso
+    forzaba al agente a un get_career_record por fila — 69 llamadas para
+    revisar 69 competencias, suficiente para agotar max_round_trips antes de
+    llegar siquiera a escribir nada (regresión real, ver bulk_update_career_record
+    y should_retry_max_tokens: ninguno de los dos ayuda si el cuello de botella
+    es de lecturas, no de escrituras ni de tokens)."""
     full = _serialize(obj)
     item: Dict[str, Any] = {"id": full.get("id")}
     for field in _LIST_LABEL_FIELDS:
@@ -215,6 +223,10 @@ def _serialize_list_item(obj: Any) -> Dict[str, Any]:
             if text:
                 item["summary"] = text[:240] + ("…" if len(text) > 240 else "")
                 break
+    if extra_fields:
+        for field in extra_fields:
+            if field in full and field not in item:
+                item[field] = full[field]
     return item
 
 
@@ -305,7 +317,8 @@ async def _execute_tool(
             search=tool_input.get("search"),
         )
         total_count = await repo.count_for_user(db, user_id)
-        serialized = [_serialize_list_item(item) for item in items]
+        extra_fields = tool_input.get("fields")
+        serialized = [_serialize_list_item(item, extra_fields) for item in items]
         return {
             "items": serialized,
             "total_count": total_count,
