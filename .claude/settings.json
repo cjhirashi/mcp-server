@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .harness/gate/check.sh > /tmp/harness_gate.log 2>&1 && echo '[harness] gate OK' || (echo '[harness] gate FALLÓ — revisa /tmp/harness_gate.log' && tail -30 /tmp/harness_gate.log)"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(.harness/gate/check.sh)",
+      "Bash(.harness/gate/check.sh --*)"
+    ]
+  }
+}

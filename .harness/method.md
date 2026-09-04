@@ -41,22 +41,37 @@ decide.**
 
 ## §2 · Rúbrica de decisión (Fase 0) — ¿entra al arnés?
 
-Se responde **antes** de crear ningún archivo.
+**Se responde SIEMPRE, en voz alta, antes de tocar un archivo** — incluida una
+petición que suena a "arregla esto"/"corrige esta falla". Que algo suene urgente o
+pequeño no exime de aplicar la rúbrica.
 
 ```
-¿Trivial / bajo riesgo / parche de < 5 min?              → SÍ → PROMPT DIRECTO. Fin.
+¿La corrección exige cambiar una decisión ya tomada en un spec/ADR
+ existente (rediseño), no solo el síntoma?                → SÍ → CARRIL SDD.
+¿El área tocada NO tiene spec.md que la cubra (sin ancla)
+ Y el cambio toca lógica de negocio o un contrato
+ (no solo config/infra)?                                  → SÍ → CARRIL SDD
+                                                                (spec mínimo primero
+                                                                 — ver nota abajo).
 ¿Cruza servicios, esquema de BD, un endpoint/contrato,
  o toca una capa/frontera nueva?                          → SÍ → CARRIL SDD.
 ¿Revertir un malentendido costaría > 4 h,
  o el trabajo dura más de una sesión,
  o hay exigencia de auditoría?                            → SÍ → CARRIL SDD.
-si no                                                     → PROMPT DIRECTO.
+¿Trivial / bajo riesgo / parche de < 5 min,
+ y ninguna de las anteriores aplica?                      → SÍ → PROMPT DIRECTO.
+en caso de DUDA                                           → CARRIL SDD.
 ```
 
 - **Prompt directo:** implementa → `gate/check.sh` → listo. Cero artefactos.
 - **Carril SDD:** §3.
+- **Área sin ancla (sin `spec.md` que la cubra):** es el estado normal del código
+  heredado (Génesis en modo alineación, sin baseline sembrado) — no una licencia para
+  saltarse Fase 1. Un spec mínimo (aunque sea de un `RF-` y tres líneas) es más barato
+  que un fix que después hay que deshacer.
 
-Regla de oro: **el mínimo rigor que elimina la ambigüedad en este contexto.**
+Regla de oro: **el mínimo rigor que elimina la ambigüedad en este contexto — y en la
+duda, el rigor gana.** Frenar en Fase 1 cuesta minutos; deshacer código cuesta sesiones.
 
 ---
 
