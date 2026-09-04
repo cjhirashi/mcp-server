@@ -888,11 +888,20 @@ async def _execute_extended(db, user_id: str, name: str, tool_input: Dict[str, A
             if not record_id or not isinstance(fields, dict):
                 errors.append({"record_id": record_id, "error": "falta record_id o fields"})
                 continue
-            result = await bedrock_service._execute_tool(
-                db, user_id, "update_career_record",
-                {"resource_key": resource_key, "record_id": record_id, "fields": fields},
-                session_id,
-            )
+            try:
+                result = await bedrock_service._execute_tool(
+                    db, user_id, "update_career_record",
+                    {"resource_key": resource_key, "record_id": record_id, "fields": fields},
+                    session_id,
+                )
+            except Exception as e:
+                # Un fallo de flush (p.ej. constraint) deja la sesión en
+                # pending-rollback: sin este rollback, todo item restante del
+                # lote fallaría con un error genérico que oculta cuál fue el
+                # que realmente rompió.
+                await db.rollback()
+                errors.append({"record_id": record_id, "error": str(e)})
+                continue
             if isinstance(result, dict) and result.get("error"):
                 errors.append({"record_id": record_id, "error": result["error"]})
             else:

@@ -347,7 +347,14 @@ async def _execute_tool(
 
     if name == "describe_resource_schema":
         repo = _get_repository(tool_input["resource_key"])
-        return {"fields": sorted(repo._indexable_columns)}
+        return {
+            "fields": sorted(repo._indexable_columns),
+            "required_fields": list(repo._required_columns),
+            "instruction": (
+                "required_fields son NOT NULL sin default: create_career_record los "
+                "necesita todos o Postgres rechaza el insert."
+            ),
+        }
 
     if name == "list_recent_changes":
         entries = await list_audit_log(db, user_id, limit=min(tool_input.get("limit", 10), 50))
@@ -377,7 +384,7 @@ async def _execute_tool(
     if name == "create_career_record":
         resource_key = tool_input["resource_key"]
         repo = _get_repository(resource_key)
-        invalid = _invalid_fields_error(repo, tool_input["fields"])
+        invalid = _invalid_fields_error(repo, tool_input["fields"], require_all=True)
         if invalid:
             return invalid
         item = await repo.create_for_user(db, user_id, tool_input["fields"])
@@ -505,21 +512,39 @@ async def restore_audit_entry(db, user_id: str, audit_id: str) -> Dict[str, Any]
     return serialized
 
 
-def _invalid_fields_error(repo: CareerRepository, fields: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Reject unknown column names before they ever reach SQLAlchemy, with
-    the real column list in the error - without this, a wrong guess (e.g.
-    `name` instead of `tag_name`) surfaces as a generic ORM TypeError that
-    tells the model nothing about what the right field is, burning an extra
-    search_knowledge_base + retry round-trip (measured: 4-6 tool calls for
-    what should take 1-2) just to rediscover the schema by trial and error."""
+def _invalid_fields_error(
+    repo: CareerRepository, fields: Dict[str, Any], require_all: bool = False
+) -> Optional[Dict[str, Any]]:
+    """Reject unknown column names (and, on create, missing NOT NULL ones)
+    before they ever reach SQLAlchemy, with the real column list in the
+    error - without this, a wrong guess (e.g. `name` instead of `tag_name`)
+    surfaces as a generic ORM TypeError that tells the model nothing about
+    what the right field is, burning an extra search_knowledge_base + retry
+    round-trip (measured: 4-6 tool calls for what should take 1-2) just to
+    rediscover the schema by trial and error.
+
+    A missing NOT NULL field is worse than a wrong name: instead of a clean
+    ORM error it flushes as a raw asyncpg IntegrityError, and - see
+    agent_loop's tool exception handler - that leaves the session's
+    transaction unrolled-back for the rest of the turn, so every write
+    after it fails with an opaque "Session's transaction has been rolled
+    back" instead of the real cause. require_all=True (create only) catches
+    it before the flush ever happens."""
     valid = set(repo._indexable_columns)
     unknown = sorted(set(fields.keys()) - valid)
-    if not unknown:
-        return None
-    return {
-        "error": f"Unknown field(s) {unknown} for this resource.",
-        "valid_fields": sorted(valid),
-    }
+    if unknown:
+        return {
+            "error": f"Unknown field(s) {unknown} for this resource.",
+            "valid_fields": sorted(valid),
+        }
+    if require_all:
+        missing = sorted(col for col in repo._required_columns if fields.get(col) is None)
+        if missing:
+            return {
+                "error": f"Missing required field(s) {missing} for this resource (NOT NULL, sin default).",
+                "required_fields": list(repo._required_columns),
+            }
+    return None
 
 
 # ---------------------------------------------------------------------------

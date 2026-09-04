@@ -78,6 +78,18 @@ class CareerRepository(Generic[ModelType]):
             attr.key for attr in column_attrs if isinstance(attr.columns[0].type, (String, Text))
         ]
         self._indexable_columns = [c for c in self._column_names if c not in ("id", "user_id")]
+        # NOT NULL columns with no Python-side or server-side default: create_for_user
+        # must receive these or Postgres rejects the INSERT. Computed once so
+        # _invalid_fields_error can reject a missing one before it ever reaches the
+        # DB, same as it already does for unknown field names.
+        self._required_columns = sorted(
+            attr.key
+            for attr in column_attrs
+            if attr.key not in ("id", "user_id")
+            and not attr.columns[0].nullable
+            and attr.columns[0].default is None
+            and attr.columns[0].server_default is None
+        )
 
     def _eager_options(self):
         rel = getattr(self.model, "linked_achievements", None)

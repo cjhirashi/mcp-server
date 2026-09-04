@@ -631,7 +631,19 @@ async def chat_stream(
                 if _wrote:
                     seen_reads.clear()
             except Exception as e:
-                # 10.3.5. Si ocurre un error al ejecutar la herramienta
+                # 10.3.5. Si ocurre un error al ejecutar la herramienta.
+                # Crítico: un fallo de flush (p.ej. IntegrityError por un NOT
+                # NULL) deja la sesión en "pending rollback" - sin este
+                # rollback, cualquier tool de escritura posterior EN ESTE
+                # MISMO TURNO (rondas siguientes, incluido el registro de
+                # auditoría) revienta con un PendingRollbackError genérico
+                # que oculta la causa real. db.rollback() es seguro de
+                # llamar aunque el error no haya sido de base de datos.
+                try:
+                    await db.rollback()
+                except Exception:
+                    logger.exception("db.rollback() falló tras error en tool %s", name)
+
                 from services.error_reporting import report_error
 
                 report_error(
