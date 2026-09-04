@@ -1,7 +1,7 @@
 ---
 titulo: Pipeline de generación de imágenes del agente Visual (generate_image)
 tipo: spec
-estado: specified
+estado: verified
 fecha: 2026-09-04
 feature_id: "002"
 covers:
@@ -29,6 +29,7 @@ covers:
   - docs/09-DECISIONS/025-migrar-generacion-imagenes-a-stability.md
   - docs/ENVIRONMENT-SECURITY.md
   - .harness/specs/002-generacion-imagenes-agente-visual/contracts/system-readiness.md
+anchor_commit: dc9aab10
 anchor_mode: advisory
 ---
 

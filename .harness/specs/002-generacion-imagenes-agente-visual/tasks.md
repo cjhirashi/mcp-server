@@ -1,7 +1,7 @@
 ---
 titulo: Tasks — Pipeline de generación de imágenes del agente Visual
 tipo: tasks
-estado: draft
+estado: verified
 fecha: 2026-09-04
 feature_id: "002"
 spec: ./spec.md
