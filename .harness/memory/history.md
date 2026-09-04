@@ -8,10 +8,9 @@ subtipo: history
 > Append-only, orden cronológico inverso (lo más reciente arriba). Una entrada
 > Session-End por sesión, con el formato fijo de `method.md §10`.
 
-## [2026-09-04] 002-generacion-imagenes-agente-visual — implementado, pendiente commit
+## [2026-09-04] 002-generacion-imagenes-agente-visual — verified
 
-- **Fase alcanzada:** implement (Fase 4 completa; commit de cierre y `estado:
-  verified` pendientes de tu aprobación)
+- **Fase alcanzada:** verified
 - **Rebotes del verificador:** 0 (sin agente `revisor` separado esta sesión — TDD
   aplicado en el mismo hilo: rojo confirmado antes de cada código, verde después)
 - **Directiva de Pausa:** sí — el usuario detuvo la sesión al ver que se estaba
@@ -19,10 +18,8 @@ subtipo: history
   se reinició desde Specify con elicitación interactiva completa antes de tocar
   más código
 - **Drift / re-anchor:** no
-- **Anclas movidas:** ninguna todavía — `anchor_commit` de `spec.md` se mueve al
-  commitear
-- **Gate:** verde (`./.harness/gate/check.sh --full` → 23 ok · 1 warn ·
-  0 error; warn = `anchor_commit` pendiente, esperado antes del commit)
+- **Anclas movidas:** `spec.md` → `dc9aab10`
+- **Gate:** verde (`./.harness/gate/check.sh --full` → 24 ok · 0 warn · 0 error)
 - **Docs actualizadas:** `docs/09-DECISIONS/025-migrar-generacion-imagenes-a-stability.md`
   (nuevo, enmienda `ADR-010`), `docs/BEDROCK-SYSTEM.md`,
   `cjhirashi-career-api/src/services/bedrock/README.md`;
@@ -42,12 +39,13 @@ subtipo: history
   claro; `agent_search_operations` deja de mencionar imágenes (sin recurso de
   imagen en su dominio). Verificado en vivo de punta a punta (Bedrock real,
   autorizado, ~$0.01-0.04 USD): imagen generada, subida a MinIO, insertada en
-  `file_uploads` (`flu-15`) sin error de tipo. Hallazgo fuera de alcance: 403 de
-  `files.cjhirashi.com` es capa Caddy (`cjhirashi-srv`), MinIO directo sirve 200 —
-  pendiente abrir mensaje en `caddy.json`, no se toca desde este repo.
-- **Próximo paso:** confirmar con el usuario si se commitea ahora (mover
-  `anchor_commit`, `estado: verified` de `spec.md`/`plan.md`/`tasks.md`); abrir el
-  mensaje de `caddy.json` sobre el 403 de `files.cjhirashi.com`.
+  `file_uploads` (`flu-15`) sin error de tipo. Commits: `a3c322a6` (ADR-002
+  arnés) · `dc9aab10` (feature) · `e78904bd` (anchor+verified).
+  **Falsa alarma descartada:** el "403 en `files.cjhirashi.com`" no era un bug de
+  Caddy/MinIO — era Cloudflare bloqueando el User-Agent por defecto de `urllib`
+  de Python (`error code: 1010`). Confirmado con `curl` y un User-Agent de
+  navegador real: ambos `200`. No se abrió mensaje en `caddy.json`.
+- **Próximo paso:** ninguno pendiente de esta feature.
 
 ## [2026-09-04] Corrección de diseño del arnés — forzar Fase 1 y gate automático
 

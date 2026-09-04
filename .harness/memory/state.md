@@ -142,16 +142,15 @@ actualizado: 2026-09-04
   contra el esquema de rutas actual (hoy `pytest.mark.skip`); `cjhirashi-career-ai`
   sigue sin suite de tests.
 - Reescritura narrativa del arc42 sin el Canal 3 (ADR-023 lo deja anotado).
-- **[2026-09-04] Feature `002-generacion-imagenes-agente-visual` — Fase 4
-  completa, sin commitear.** Detalle completo en el Session-End de `history.md` y
-  en `.harness/specs/002-generacion-imagenes-agente-visual/` (spec/plan/tasks, 12
-  `RF-`). Las 4 causas raíz del pipeline `generate_image` resueltas (modelo Bedrock,
-  sesión, MinIO, esquema `file_uploads.related_evidence_id`) + contrato de
-  delegación del `purpose` + `GET /system/readiness` nuevo. Verificado en vivo de
-  punta a punta con Bedrock real (autorizado). Gate `--full`: 23 ok · 1 warn
-  (`anchor_commit` pendiente) · 0 error. **Pendiente:** confirmar commit de cierre
-  con el humano (mueve `anchor_commit`, `estado: verified`).
-  **Hallazgo fuera de alcance:** `files.cjhirashi.com` da 403 sirviendo objetos
-  públicos de MinIO vía Caddy (MinIO directo sí sirve 200) — capa `cjhirashi-srv`;
-  pendiente abrir mensaje en `caddy.json`, no se toca desde aquí.
+- **[2026-09-04] Feature `002-generacion-imagenes-agente-visual` — CERRADA
+  (`verified`).** Commits `a3c322a6` (ADR-002 arnés) · `dc9aab10` (feature, 12
+  `RF-`) · `e78904bd` (anchor + verified). Gate `--full`: 24 ok · 0 warn · 0 error.
+  Detalle completo en el Session-End de `history.md` y en
+  `.harness/specs/002-generacion-imagenes-agente-visual/`.
+  **Falsa alarma corregida:** el "403 en `files.cjhirashi.com`" reportado durante
+  el cierre **no era un bug** — era Cloudflare bloqueando el User-Agent por
+  defecto de `urllib` de Python (`error code: 1010`, "browser signature banned").
+  Confirmado con `curl` y con un User-Agent de navegador real: ambos `200`. Las
+  imágenes generadas sí cargan para cualquier cliente normal (frontend, curl,
+  navegador). No se abre mensaje en `caddy.json` — no había nada que reportar.
 - Antes de tocar nada: correr `.harness/gate/check.sh`.
