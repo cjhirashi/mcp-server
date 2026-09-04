@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceptado — 2026-08-16. Ampliado — 2026-08-26 (secciones de bucket por propósito, medidas fijas, flujo "guardar imagen existente", fix de bug en el cliente Titan).
+Aceptado — 2026-08-16. Ampliado — 2026-08-26 (secciones de bucket por propósito, medidas fijas, flujo "guardar imagen existente", fix de bug en el cliente Titan). **Enmendado — 2026-09-04:** el modelo de generación de imágenes (Titan Image Generator) cambia a Stability Stable Image Core por retiro de Titan por parte de AWS — ver [ADR-025](./025-migrar-generacion-imagenes-a-stability.md).
 
 ## agent_pdf_design
 

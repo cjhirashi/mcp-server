@@ -8,6 +8,69 @@ subtipo: history
 > Append-only, orden cronológico inverso (lo más reciente arriba). Una entrada
 > Session-End por sesión, con el formato fijo de `method.md §10`.
 
+## [2026-09-04] 002-generacion-imagenes-agente-visual — implementado, pendiente commit
+
+- **Fase alcanzada:** implement (Fase 4 completa; commit de cierre y `estado:
+  verified` pendientes de tu aprobación)
+- **Rebotes del verificador:** 0 (sin agente `revisor` separado esta sesión — TDD
+  aplicado en el mismo hilo: rojo confirmado antes de cada código, verde después)
+- **Directiva de Pausa:** sí — el usuario detuvo la sesión al ver que se estaba
+  corrigiendo directo sin pasar por Fase 1 (ver corrección del 2026-09-04 arriba);
+  se reinició desde Specify con elicitación interactiva completa antes de tocar
+  más código
+- **Drift / re-anchor:** no
+- **Anclas movidas:** ninguna todavía — `anchor_commit` de `spec.md` se mueve al
+  commitear
+- **Gate:** verde (`./.harness/gate/check.sh --full` → 23 ok · 1 warn ·
+  0 error; warn = `anchor_commit` pendiente, esperado antes del commit)
+- **Docs actualizadas:** `docs/09-DECISIONS/025-migrar-generacion-imagenes-a-stability.md`
+  (nuevo, enmienda `ADR-010`), `docs/BEDROCK-SYSTEM.md`,
+  `cjhirashi-career-api/src/services/bedrock/README.md`;
+  `docs/ENVIRONMENT-SECURITY.md` revisado, no aplica (checklist genérico)
+- **Decisiones de diseño / límites de integración:** pipeline `generate_image`
+  con 4 causas raíz resueltas — Bedrock Titan EOL → Stability
+  `stable-image-core-v1:1` en `us-west-2` (`BEDROCK_IMAGE_REGION` nuevo, separado
+  de `BEDROCK_REGION`); `MissingGreenlet` por `conversation` expirada tras
+  `db.rollback()` en delegación → `conversation_id` como valor plano;
+  credenciales MinIO desincronizadas → contenedor recreado con `.env` vigente
+  (verificado, datos intactos); `file_uploads.related_evidence_id`
+  integer→varchar(20) vía migración `e1f2a3b4c5d6`. Nuevo endpoint
+  `GET /system/readiness` (separado de `/health`, para no ampliar el radio de un
+  blip de MinIO al healthcheck de Docker/Caddy). Contrato de delegación nuevo:
+  `agent_professional_identity`/`agent_digital_presence`/`agent_configuration`
+  declaran `purpose` al delegar a `agent_visual_design`; éste pregunta si no está
+  claro; `agent_search_operations` deja de mencionar imágenes (sin recurso de
+  imagen en su dominio). Verificado en vivo de punta a punta (Bedrock real,
+  autorizado, ~$0.01-0.04 USD): imagen generada, subida a MinIO, insertada en
+  `file_uploads` (`flu-15`) sin error de tipo. Hallazgo fuera de alcance: 403 de
+  `files.cjhirashi.com` es capa Caddy (`cjhirashi-srv`), MinIO directo sirve 200 —
+  pendiente abrir mensaje en `caddy.json`, no se toca desde este repo.
+- **Próximo paso:** confirmar con el usuario si se commitea ahora (mover
+  `anchor_commit`, `estado: verified` de `spec.md`/`plan.md`/`tasks.md`); abrir el
+  mensaje de `caddy.json` sobre el 403 de `files.cjhirashi.com`.
+
+## [2026-09-04] Corrección de diseño del arnés — forzar Fase 1 y gate automático
+
+- **Fase alcanzada:** (mantenimiento del arnés — no aplica ciclo de feature)
+- **Rebotes del verificador:** 0
+- **Directiva de Pausa:** no
+- **Drift / re-anchor:** no
+- **Anclas movidas:** ninguna
+- **Gate:** verde
+- **Docs actualizadas:** `CLAUDE.md` (reglas duras), `.harness/method.md §2` (rúbrica),
+  `.claude/settings.json` (nuevo, hook Stop), `.harness/decisions/ADR-002-*`
+- **Decisiones de diseño / límites de integración:**
+  - El usuario reportó que pedir "corrige fallas" no pasaba por Fase 1. Diagnóstico:
+    faltaba el hook `Stop` que corría el gate automáticamente (se perdió al reestructurar
+    del arnés viejo), `CLAUDE.md` perdió sus reglas duras explícitas, y el código heredado
+    no tiene ningún `spec.md` BASELINE (nada que anclar). Ver `ADR-002`.
+  - Corrección propagada también a `cjhirashi-srv`, `hira` y `reference/` del repo
+    `harness` — es un defecto del esquema simplificado, no de este proyecto.
+  - **Pendiente (no resuelto aquí):** sembrar `spec.md` BASELINE del código existente
+    (empezar por `api`/`admin`, lo que más cambia) para que el anclaje tenga algo real
+    contra qué comparar.
+- **Próximo paso:** el operador decide si prioriza la pasada de alineación baseline.
+
 ## [2026-09-04] 001 · Sidebar contextual configurable por sección — verified
 
 - **Fase alcanzada:** verified (compuerta por defecto verde; humano confirmó el cierre).

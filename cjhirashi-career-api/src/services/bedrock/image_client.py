@@ -1,9 +1,16 @@
 """
-Generación de imágenes — Bedrock Titan Image Generator v2.
+Generación de imágenes — Bedrock Stability Stable Image Core.
+
+Titan Image Generator (v1/v2) llegó a fin de vida y Nova Canvas está sin
+acceso habilitado para esta cuenta en us-east-1 (Legacy) — ver
+.harness/memory/state.md. Stable Image Core solo está disponible en
+us-west-2, de ahí BEDROCK_IMAGE_REGION separado de BEDROCK_REGION (que sigue
+sirviendo Converse/embeddings en us-east-1).
 
 Sube bytes a MinIO vía tools.generate_image. Ver ADR-010.
 """
 import asyncio
+import base64
 import json
 import logging
 
@@ -27,7 +34,7 @@ def _get_client():
     if _bedrock_client is None:
         _bedrock_client = boto3.client(
             "bedrock-runtime",
-            region_name=settings.BEDROCK_REGION,
+            region_name=settings.BEDROCK_IMAGE_REGION,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         )
@@ -38,14 +45,19 @@ def _get_client():
 # Generación de imagen
 # ============================================================================
 
-async def generate_image_bytes(prompt: str, width: int = 1200, height: int = 627) -> bytes:
-    """Invoca Titan Image y devuelve PNG bytes."""
+async def generate_image_bytes(prompt: str, aspect_ratio: str = "1:1") -> bytes:
+    """Invoca Stable Image Core y devuelve PNG bytes.
+
+    `aspect_ratio` es uno de los valores fijos que acepta el modelo (1:1,
+    16:9, 21:9, 2:3, 3:2, 4:5, 5:4, 9:16, 9:21) — el recorte a la medida
+    exacta del purpose lo hace después image_pipeline.finalize_png.
+    """
 
     def _invoke():
         body = json.dumps({
-            "taskType": "TEXT_IMAGE",
-            "textToImageParams": {"text": prompt},
-            "imageGenerationConfig": {"numberOfImages": 1, "width": width, "height": height, "quality": "standard"},
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "output_format": "png",
         })
         return _get_client().invoke_model(
             modelId=settings.BEDROCK_IMAGE_MODEL_ID,
@@ -57,8 +69,6 @@ async def generate_image_bytes(prompt: str, width: int = 1200, height: int = 627
     try:
         response = await asyncio.to_thread(_invoke)
         payload = json.loads(response["body"].read())
-        import base64
-
         b64 = payload["images"][0]
         return base64.b64decode(b64)
     except Exception as e:
@@ -67,4 +77,7 @@ async def generate_image_bytes(prompt: str, width: int = 1200, height: int = 627
             str(e) or "Image generation failed", "bedrock:image_client",
             error_type=type(e).__name__, exc=e, severity="error",
         )
-        raise BedrockError(f"Image generation failed: {e}") from e
+        raise BedrockError(
+            f"Image generation failed (model={settings.BEDROCK_IMAGE_MODEL_ID}, "
+            f"region={settings.BEDROCK_IMAGE_REGION}): {e}"
+        ) from e

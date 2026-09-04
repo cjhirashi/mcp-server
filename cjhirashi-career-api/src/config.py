@@ -94,7 +94,13 @@ class Settings(BaseSettings):
     BEDROCK_USE_CONVERSE_STREAM: bool = False
     BEDROCK_DEFAULT_MODEL_ID: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     BEDROCK_ORCHESTRATOR_MODEL_ID: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-    BEDROCK_IMAGE_MODEL_ID: str = "amazon.titan-image-generator-v2:0"
+    # Titan Image Generator (v1 y v2) llegó a fin de vida y Nova Canvas está sin
+    # acceso habilitado en us-east-1 para esta cuenta (Legacy). Los modelos
+    # Stability con generación de texto-a-imagen (Core/Ultra/SD3.5) solo están
+    # disponibles en us-west-2 — de ahí la región separada. Ver
+    # .harness/memory/state.md (bug agente de imágenes) y ADR-010.
+    BEDROCK_IMAGE_REGION: str = "us-west-2"
+    BEDROCK_IMAGE_MODEL_ID: str = "stability.stable-image-core-v1:1"
     BEDROCK_MAX_IMAGES_PER_DAY: int = 20
     BEDROCK_MAX_TOOL_RESULT_CHARS: int = 8000
     # inferenceConfig.maxTokens de cada llamada Converse. El default de boto3/

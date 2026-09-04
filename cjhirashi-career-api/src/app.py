@@ -229,6 +229,21 @@ async def health_check():
     }
 
 
+@app.get("/system/readiness", tags=["Health"])
+async def readiness_check():
+    """
+    Verifica dependencias externas que /health no comprueba (hoy: MinIO) - separado
+    de /health para no ampliar el radio de un blip transitorio al healthcheck de
+    Docker/Caddy. Ver RF-008, spec 002.
+    """
+    minio_ok = storage_service.check_connection()
+    ready = minio_ok
+    return JSONResponse(
+        content={"status": "ready" if ready else "not_ready", "checks": {"minio": minio_ok}},
+        status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
 # Root endpoint
 @app.get("/", tags=["Root"])
 async def root():

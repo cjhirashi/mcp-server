@@ -325,6 +325,7 @@ _CONFIGURATION_SUFFIX = (
     "de metodologías) que aplican a TODOS los agentes. Tool `bedrock_global_settings` "
     "(action=get|update_system_prompt|update_global_rules).\n"
     "No tocas fotos de agente: eso es agent_visual_design con resource_key=agent-profile. "
+    "Para generar una foto nueva de catálogo, delega con purpose=agentes. "
     "No tocas operational-methodologies (contenido de las metodologías): eso es "
     "agent_methodologies; tú solo asignas cuáles consulta cada agente. "
     "Reportes de falla y bitácora de cambios del agente son de agent_settings, no tuyos. "
@@ -458,7 +459,7 @@ _PROFILES: dict[str, AgentProfile] = {
             "ubicación, contacto, idiomas, autorización de trabajo). Léela antes de redactar narrativa, "
             "CVs o formularios; no la confundas con `identity` (tagline, bio y UVP). "
             "Opera solo ese dominio. Bitácora → agent_changelog; PDF de un registro → agent_pdf_render; "
-            "imágenes → agent_visual_design; plan de pasos → agent_task_manager; "
+            "imágenes de un proyecto → agent_visual_design con purpose=proyectos; plan de pasos → agent_task_manager; "
             "redacción de CV → agent_cv_writing; cover letter → agent_cover_letter_writing; "
             "consulta web → agent_web_search."
         ),
@@ -487,7 +488,7 @@ _PROFILES: dict[str, AgentProfile] = {
             "Nunca uses create_career_record para ofertas de discovery. "
             "PDF de un CV o carta ya redactados → agent_pdf_render. "
             "Investigar una empresa o tecnología en internet → agent_web_search. "
-            "Bitácora → agent_changelog; imágenes → agent_visual_design; plan → agent_task_manager."
+            "Bitácora → agent_changelog; plan → agent_task_manager."
         ),
         default_model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
         level=2,
@@ -504,7 +505,8 @@ _PROFILES: dict[str, AgentProfile] = {
             "Repos, archivos o estado de GitHub en vivo → agent_github "
             "(github-profile es ficha CRUD, no la API). "
             "Consulta web → agent_web_search. "
-            "Imágenes → agent_visual_design; bitácora → agent_changelog; PDF → agent_pdf_render; "
+            "Imágenes para publicaciones o el portal → agent_visual_design con purpose=publicaciones; "
+            "bitácora → agent_changelog; PDF → agent_pdf_render; "
             "plan → agent_task_manager."
         ),
         default_model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -579,7 +581,9 @@ _PROFILES: dict[str, AgentProfile] = {
             "proyectos (1920x1080), publicaciones (1920x1080). Todo PNG comprimido para web. "
             "Si quien delega ya tiene una imagen (adjunta, file_id) y solo quiere guardarla/optimizarla, "
             "usa store_uploaded_image (NO generes nada nuevo). Si no tiene imagen, pide o usa el prompt y "
-            "usa generate_image (Titan). Paleta cyan #0891B2, estilo profesional/tecnológico para lo que generes. "
+            "usa generate_image. Si quien delega no te dice purpose (agentes/proyectos/publicaciones) "
+            "o no queda claro cuál aplica, pregunta antes de generar — no asumas. "
+            "Paleta cyan #0891B2, estilo profesional/tecnológico para lo que generes. "
             "Nombra el archivo de forma legible (name). Al terminar, devuelve la image_url a quien delegó "
             "para que la cargue en su registro (o usa attach_image_to_record si te dan resource_key/record_id, "
             "incluyendo agent-profile para fotos del catálogo). No afirmes un adjunto hasta que la tool confirme."

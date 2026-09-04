@@ -1907,17 +1907,25 @@ Ver diagrama del módulo (Nivel 2).
 
 # Nivel 2 — `image_client.py`
 
-Cliente Titan Image Generator v2 (`invoke_model`, **no** Converse). `tools.generate_image` toma los PNG bytes, los sube a [MinIO](../../../docs/sections/files/README.md) y registra el asset.
+Cliente Bedrock Stability **Stable Image Core** (`invoke_model`, **no** Converse;
+región `BEDROCK_IMAGE_REGION=us-west-2`, separada de `BEDROCK_REGION` que sirve
+Converse/embeddings). Reemplaza a Titan Image Generator (v1/v2 llegaron a EOL) y a
+Nova Canvas (sin acceso habilitado en esta cuenta) — ver ADR-025, spec 002.
+`tools.generate_image` toma los PNG bytes, los sube a
+[MinIO](../../../docs/sections/files/README.md) y registra el asset.
 
-**Lee también:** [sections/files](../../../docs/sections/files/README.md) · ratio por defecto alineado a posts de [LinkedIn](../../../docs/sections/linkedin/README.md)
+**Lee también:** [sections/files](../../../docs/sections/files/README.md)
 
 ### Recibe
 
-`prompt`, `width` (default 1200), `height` (default 627, ratio LinkedIn).
+`prompt`, `aspect_ratio` (uno de los valores fijos que acepta el modelo — `1:1`,
+`16:9`, etc. — calculado por `image_pipeline.stability_aspect_ratio` a partir del
+`PurposeSpec` de cada `purpose`; el recorte a la medida exacta lo hace después
+`finalize_png`).
 
 ### Entrega
 
-`bytes` PNG. Fallo AWS → `BedrockError`.
+`bytes` PNG. Fallo AWS → `BedrockError` (mensaje incluye `modelId` y región).
 
 ### Ejemplo
 
@@ -1928,11 +1936,22 @@ Prompt `"banner cyan profesional para publicación de proyecto"` → PNG que la 
 ```mermaid
 flowchart TD
     TOOL[tools.generate_image] --> GEN[generate_image_bytes]
-    GEN --> AWS[invoke_model Titan Image]
+    GEN --> AWS[invoke_model Stable Image Core]
     AWS --> B64[decode images 0]
     B64 --> PNG[bytes]
     PNG --> MINIO[upload]
 ```
+
+**Delegación (RF-011/RF-012):** quien delega a `agent_visual_design` DEBE declarar
+el `purpose` explícito según su dominio (`agent_professional_identity` →
+`proyectos`, `agent_digital_presence` → `publicaciones`, `agent_configuration` →
+`agentes`); el agente Visual no adivina — si no viene claro, pregunta antes de
+generar (`delegate_to_specialist` es de un solo golpe, sin ida y vuelta L2↔L3).
+
+**Readiness (RF-008):** `GET /system/readiness` (separado de `/health`) confirma
+que las credenciales configuradas autentican contra MinIO
+(`storage_service.check_connection`) — detecta una desincronización antes de que
+falle un upload real.
 
 ---
 
@@ -1940,15 +1959,16 @@ flowchart TD
 
 ### Recibe
 
-`prompt: str`, `width`, `height`.
+`prompt: str`, `aspect_ratio: str`.
 
 ### Entrega
 
-`bytes`. Body AWS: `taskType=TEXT_IMAGE`, `quality=standard`, 1 imagen.
+`bytes`. Body AWS: `{"prompt", "aspect_ratio", "output_format": "png"}` (formato
+Stability, no Titan).
 
 ### Ejemplo
 
-`await generate_image_bytes("icono de API REST, fondo oscuro", 1024, 1024)`.
+`await generate_image_bytes("icono de API REST, fondo oscuro", aspect_ratio="1:1")`.
 
 ### Flujo
 

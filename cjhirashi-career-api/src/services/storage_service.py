@@ -130,6 +130,16 @@ def set_visibility(stored_filename: str, category: Optional[str], is_public: boo
     return new_key
 
 
+def check_connection() -> bool:
+    """Authenticate against MinIO with the configured credentials and confirm the
+    bucket exists - used by GET /system/readiness. False on any S3Error (bad
+    credentials, bucket missing, MinIO unreachable), never raises."""
+    try:
+        return get_client().bucket_exists(settings.MINIO_BUCKET)
+    except S3Error:
+        return False
+
+
 def delete_file(stored_filename: str) -> bool:
     """Delete an object. Returns False (instead of raising) if it was already gone,
     since the caller's DB row is the source of truth for whether it 'exists'."""

@@ -8,6 +8,22 @@ actualizado: 2026-09-04
 
 ## ⚠️ Correcciones del usuario (leer SIEMPRE — no borrar)
 
+### [2026-09-04] El arnés no estaba forzando la Fase 1 al pedir "corrige esta falla"
+- **Qué pasó:** el usuario reportó que, al pedir corregir fallas, el flujo saltaba
+  directo a "arreglar/rediseñar" sin pasar por Specify. Evidencia en este mismo
+  archivo: los bugs de sesión/MinIO/imágenes y el retiro del MCP Server se resolvieron
+  como "Obstáculos y resolución" con commits directos, sin `spec.md`/`plan.md`/`tasks.md`.
+  Causa raíz (`ADR-002`): (1) faltaba `.claude/settings.json` — sin hook `Stop`, el gate
+  solo corría si el agente decidía correrlo; (2) `CLAUDE.md` perdió las "reglas duras"
+  explícitas que el arnés viejo sí tenía; (3) el código heredado no tiene `spec.md`
+  BASELINE (Génesis en alineación nunca sembró uno) — nada que anclar, nada que avise.
+- **Corrección:** añadido el hook `Stop` (`.claude/settings.json`), reglas duras en
+  `CLAUDE.md`, y dos ramas nuevas en la rúbrica de `method.md §2` (rediseña una decisión
+  existente → SDD; área sin ancla + toca negocio/contrato → SDD). Desempate: en duda, SDD.
+- **Cómo aplicar:** ante "arregla X"/"corrige X", clasifica con la rúbrica ANTES de
+  tocar nada, en voz alta. "Área sin spec.md" no es luz verde — es la señal de que hace
+  falta un spec mínimo, no de que se puede saltar Fase 1.
+
 ### [2026-09-02] No mezclar documentos del arnés con documentos del proyecto
 - **Qué pasó:** se metieron manuales del arnés dentro de `docs/`.
 - **Corrección:** `docs/` = producto (arc42, ADRs, diseño). `.harness/` = cómo
@@ -55,26 +71,12 @@ actualizado: 2026-09-04
   `init_db`; `alembic upgrade head` tras rebuild). Sidebar derecho condicional (sin
   chat ni instrucciones → ni panel ni botón). ADR-024. **Pendiente:** merge del PR +
   `alembic upgrade head` en el deploy.
-- **[2026-09-04] Mensajes de `caddy.json` resueltos en código** (pendiente de cerrarlos
-  con `bin/caddy-msg` desde el repo `cjhirashi-srv`):
-  - **MSG-0002 (bloqueo):** el API volvió a `:8001` tras el restore. Corregido a `:8000`
-    en `cjhirashi-career-api/Dockerfile` (EXPOSE/HEALTHCHECK/CMD) y en el healthcheck
-    del `docker-compose.yml`. Rebuild + recreate hechos. Verificado: `GET /health` 200
-    vía Caddy en `admin.cjhirashi.com/api/` y `portafolio.cjhirashi.com/api/`.
-  - **MSG-0001 (cambio de red):** `net-cjhirashi-career` declarada `external` y añadida a
-    los 5 contenedores (admin, portfolio, mcp, api, minio). Cerrado por el humano.
-  - **MSG-0004 (cierre de la migración de red) — hecho 2026-09-04:** `net-cjhirashi-career`
-    añadida a `postgres` y `qdrant`; luego `network-cjhirashi-srv` **quitada de los 6**
-    (admin, portfolio, api, minio, postgres, qdrant) y de la sección `networks:` del
-    `docker-compose.yml`. Recreados en 2 fases (verificación entre medias, como pedía el
-    mensaje). Verificado: los 6 en `net-cjhirashi-career` **solamente**; api resuelve
-    postgres/qdrant/minio por esa red; `admin`/`portafolio` 200, `/api/health` 200,
-    `/api/public/home` 200. En `network-cjhirashi-srv` sólo quedan `caddy_proxy` (de
-    cjhirashi-srv) y `admin_dev_test3` (ajeno). **MSG-0004 cerrado (`resuelto`)** por
-    cjhirashi-srv el 2026-09-04 (verificaron su lado; cierra también el paso 3 de MSG-0001).
-    Los 4 mensajes de `caddy.json` quedan `resuelto`. Re-verificado runtime tras su ajuste:
-    los 6 sólo en `net-cjhirashi-career`, schedulers del `api` consultando Postgres OK,
-    `mcp.cjhirashi.com` ya sin respuesta (host retirado).
+- **[2026-09-04] Mensajes de `caddy.json` — los 4 cerrados (`resuelto`):** MSG-0002
+  (API `:8001`→`:8000` en `Dockerfile`+`docker-compose.yml`), MSG-0001 (`net-cjhirashi-career`
+  `external` en los 5 contenedores), MSG-0004 (esa red también en postgres/qdrant, luego
+  `network-cjhirashi-srv` retirada de los 6 + de `networks:`). Verificado runtime: los 6
+  solo en `net-cjhirashi-career`, api resuelve postgres/qdrant/minio, `admin`/`portafolio`/
+  `/api/health`/`/api/public/home` 200, `mcp.cjhirashi.com` sin respuesta (host retirado).
 - Repo en la rama `recover/pre-section-tables` (commit base 8227848). El backlog del
   arnés anterior **no** se importó: era sobre trabajo posterior a este commit o
   revertido. Las features nuevas las prioriza el humano.
@@ -99,44 +101,40 @@ actualizado: 2026-09-04
 
 ## Obstáculos y resolución
 
-- **[2026-09-04] Compuerta `api` reparada** (fallos pre-existentes, no de la feature
-  001). Los tests `Evidence`/`JobStrategy` ya se habían retirado (commit ff72127);
-  quedaban: (a) `33 errors` por `JSONB` sin compilar en el SQLite de los fixtures;
-  (b) `test_auth::test_extract_user_id_from_token` con aserción `str` vs `int`
-  obsoleta; (c) `tests/integration/test_auth_integration.py` contra rutas `/api/v1/*`
-  muertas (404). **Resuelto en commit aparte:** shim `@compiles(JSONB,"sqlite")` en
-  `tests/conftest.py`; camino a Postgres desechable vía `TEST_DATABASE_URL`
-  (+ `pytest_collection_modifyitems` que salta los tests con fixtures PG-only:
-  `test_db`/`db_session`/`test_user`/…); aserción de `test_auth` corregida a `str`;
-  `pytest.mark.skip` de módulo en `test_auth_integration.py`. Resultado:
-  `309 passed, 72 skipped, 0 failed, 0 errors`. Existe la BD `career_db_test` en el
-  contenedor `postgres_db` para el camino `TEST_DATABASE_URL` (aislada de dev).
-- **[2026-09-04] Compuerta `admin`/`portfolio` saneada** (commit `4ec56f8`). El repo
-  `cjhirashi-career-admin` **no versiona lockfile** (`.gitignore` lo excluye) y
-  `node_modules` no traía `react-router-dom`; `npm install` lo dejó ejecutable. Los
-  **14 tests pre-existentes** en rojo eran todos desalineación con el código actual
-  (IDs prefijados vs numéricos, `scrollIntoView` sin stub en jsdom, `tokenExpiresAt`
-  no fijado, auto-mock de axios, forma de error axios `response.data.detail`, `mb-8`
-  movido de `<h1>` a contenedor, breadcrumb por CSS, nombre accesible de opción de
-  `ThemedSelect`) — corregidos. `cjhirashi-career-admin` `435 passed`;
-  `cjhirashi-career-portfolio` `309 passed` (`cache:false` en su `vitest.config.ts`
-  para esquivar un `node_modules/.vite/vitest` con otro dueño).
-- **[2026-09-04] `check.sh` — cambios sin autoría + robustez, ahora commiteados**
-  (commit `a8891b6f`, con confirmación del humano): bloque opcional
-  `source gate/project.sh`, exclusión de `.harness/gate/` en la regla de TODO, y
-  `run_py_tests` trata `pytest` exit 5 ("sin tests") como SKIP — así
-  `cjhirashi-career-ai` (directorio **git-ignored**, scaffold sin suite) ya no
-  cierra la compuerta en `--full`. `AGENTS.md` + `.claude/agents/` también
-  commiteados en ese chore. `./.harness/gate/check.sh --full` → **22 ok · 0 error**.
+- **[2026-09-04] Compuerta `api`/`admin`/`portfolio` reparada** (fallos
+  pre-existentes, no de la feature 001): shim JSONB→SQLite en fixtures, camino
+  `TEST_DATABASE_URL` a Postgres desechable, aserción `test_auth` obsoleta,
+  lockfile/`react-router-dom` faltantes en `admin`. `api` `309 passed`; `admin`
+  `435 passed`; `portfolio` `309 passed`.
+- **[2026-09-04] `check.sh` — robustez, commiteado** (`a8891b6f`): `run_py_tests`
+  trata `pytest` exit 5 como SKIP (no cierra la compuerta por `cjhirashi-career-ai`
+  sin suite); `source gate/project.sh` opcional; `.harness/gate/` excluido de la
+  regla de comentarios pendientes sin ticket.
 
 ## Próximo paso concreto
 
 - **001 cerrada y desplegada.** No queda nada de 001.
-- **Hazard nuevo:** `career_db.alembic_version` = `c4d5e6f7a8b9` viene en parte de
-  trabajo abandonado en otra rama (commits `babd50f0`/`61783017` traían una migración
-  con esa misma ID que añadía `visibility_level`/`is_superuser`/jerarquía de
-  secciones). Si esas columnas/tablas existen en `career_db` son leftovers inertes;
-  quien retome ese trabajo debe usar DDL con `IF [NOT] EXISTS`.
+- **[2026-09-04] Hazard investigado y CERRADO (no hubo pérdida de datos):** el usuario
+  reportó tablas vacías en `career_db` (alarma de "se perdió información"). Se auditó
+  fila por fila (65 tablas). Conclusión: `admin_sections_l1` (54 filas),
+  `admin_sections_l2` (0), `admin_sections_l3` (0) y `admin_views` (123 filas) son
+  **restos físicos de `origin/develop`** (`babd50f0`/`61783017`, jerarquía L1/L2/L3 +
+  vistas, ADR-023 versión abandonada) — esa rama **nunca se fusionó a `main`**
+  (`git merge-base --is-ancestor` = false) y reutilizó por colisión el revision ID
+  `c4d5e6f7a8b9` que luego también usó el trabajo real de 001
+  (`c4d5e6f7a8b9_drop_admin_section_override_description.py`). El código de `main`
+  **no referencia estas 4 tablas en ningún punto** (`grep` de `AdminSectionL1/L2/L3`,
+  `AdminView` sobre `src/` → cero resultados); el catálogo de secciones vigente vive
+  en código (`services/admin_sections.py`) + `admin_section_overrides` (JSONB). Son
+  leftovers inertes de un experimento no fusionado, no datos de producto perdidos.
+  Resto de tablas en 0 (`applications`, `interviews`, `events`, `metrics`,
+  `search_plans`, `linkedin_posts`, `application_interactions`, `bedrock_custom_tools`,
+  `bedrock_agent_delegation`, `bedrock_agent_profile_photos`, `refresh_tokens`,
+  `user_sessions`) son features de dominio aún sin uso, no regresiones.
+  **Decisión del humano (2026-09-04): dejar las tablas huérfanas tal cual, solo
+  documentar** — no se borran por ahora. Si se retoma la jerarquía L1/L2/L3 desde
+  `develop`, esa migración debe cambiar de revision ID (ya no puede ser
+  `c4d5e6f7a8b9`) y usar DDL con `IF [NOT] EXISTS`.
 - **Cuidado al desplegar:** `docker compose up -d` puede recrear `api` con un
   `DATABASE_URL` obsoleto — usar `up -d --force-recreate --no-deps api` y verificar
   `docker inspect ... .Config.Env`.
@@ -144,4 +142,16 @@ actualizado: 2026-09-04
   contra el esquema de rutas actual (hoy `pytest.mark.skip`); `cjhirashi-career-ai`
   sigue sin suite de tests.
 - Reescritura narrativa del arc42 sin el Canal 3 (ADR-023 lo deja anotado).
+- **[2026-09-04] Feature `002-generacion-imagenes-agente-visual` — Fase 4
+  completa, sin commitear.** Detalle completo en el Session-End de `history.md` y
+  en `.harness/specs/002-generacion-imagenes-agente-visual/` (spec/plan/tasks, 12
+  `RF-`). Las 4 causas raíz del pipeline `generate_image` resueltas (modelo Bedrock,
+  sesión, MinIO, esquema `file_uploads.related_evidence_id`) + contrato de
+  delegación del `purpose` + `GET /system/readiness` nuevo. Verificado en vivo de
+  punta a punta con Bedrock real (autorizado). Gate `--full`: 23 ok · 1 warn
+  (`anchor_commit` pendiente) · 0 error. **Pendiente:** confirmar commit de cierre
+  con el humano (mueve `anchor_commit`, `estado: verified`).
+  **Hallazgo fuera de alcance:** `files.cjhirashi.com` da 403 sirviendo objetos
+  públicos de MinIO vía Caddy (MinIO directo sí sirve 200) — capa `cjhirashi-srv`;
+  pendiente abrir mensaje en `caddy.json`, no se toca desde aquí.
 - Antes de tocar nada: correr `.harness/gate/check.sh`.

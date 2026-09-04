@@ -120,7 +120,7 @@ _RAW_TOOLS: List[Dict[str, Any]] = [
     {
         "name": "generate_image",
         "description": (
-            "Pide el prompt al solicitante y genera una imagen IA (Titan) para agentes/proyectos/publicaciones. "
+            "Pide el prompt al solicitante y genera una imagen IA para agentes/proyectos/publicaciones. "
             "Ajusta y sube a MinIO en la carpeta de purpose ya en la medida exacta (500x500 agentes, "
             "1920x1080 proyectos/publicaciones), PNG comprimido para web. name opcional (si falta, se deriva del prompt)."
         ),
@@ -1034,10 +1034,13 @@ async def _execute_extended(db, user_id: str, name: str, tool_input: Dict[str, A
         from services.bedrock.image_client import generate_image_bytes
 
         spec = image_pipeline.resolve_purpose(tool_input["purpose"])
-        gen_w, gen_h = image_pipeline.titan_generation_dims(spec)
-        raw = await generate_image_bytes(tool_input["prompt"], width=gen_w, height=gen_h)
+        prompt = (tool_input.get("prompt") or "").strip()
+        if not prompt:
+            raise BedrockError("prompt vacío: describe qué imagen generar")
+        aspect_ratio = image_pipeline.stability_aspect_ratio(spec)
+        raw = await generate_image_bytes(prompt, aspect_ratio=aspect_ratio)
         finalized = image_pipeline.finalize_png(raw, spec)
-        name_hint = image_pipeline.slug_name(tool_input.get("name"), tool_input["prompt"])
+        name_hint = image_pipeline.slug_name(tool_input.get("name"), prompt)
         stored = storage_service.upload_file(
             data=io.BytesIO(finalized), original_filename=f"{name_hint}.png", size=len(finalized),
             content_type="image/png", category=spec.category, is_public=True, name_hint=name_hint,
@@ -1046,7 +1049,7 @@ async def _execute_extended(db, user_id: str, name: str, tool_input: Dict[str, A
         row = FileUpload(
             user_id=user_id, original_filename=f"{name_hint}.png", stored_filename=stored, file_path=stored,
             file_type=FileType.IMAGE, mime_type="image/png", file_size=len(finalized),
-            description=tool_input["prompt"][:500], category=spec.category, is_public=True,
+            description=prompt[:500], category=spec.category, is_public=True,
             download_url=url,
         )
         db.add(row)

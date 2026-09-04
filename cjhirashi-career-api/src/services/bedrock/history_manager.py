@@ -59,8 +59,12 @@ async def get_or_create_conversation(
     return row
 
 
-async def append_message(db: AsyncSession, conversation: BedrockConversation, role: str, content: str) -> None:
-    db.add(BedrockConversationMessage(conversation_id=conversation.id, role=role, content=content))
+async def append_message(db: AsyncSession, conversation_id: str, role: str, content: str) -> None:
+    """Recibe el id ya resuelto (no el objeto ORM): entre cargar la conversación y
+    llamar aquí puede mediar un `db.rollback()` de una tool fallida en el mismo
+    turno (incluida una sub-delegación), que expira el objeto — tocar un atributo
+    expirado fuera de un `await` revienta con MissingGreenlet. Ver agent_loop.py."""
+    db.add(BedrockConversationMessage(conversation_id=conversation_id, role=role, content=content))
     await db.commit()
 
 

@@ -5,7 +5,11 @@ Documento índice del Harness Converse (ADR-008, ADR-012).
 ## 1. Resumen
 
 - **Harness** en `cjhirashi-career-api/src/services/bedrock/` — loop Converse, historial PG, tools, presupuesto, jerarquía de 3 niveles.
-- **AWS:** solo `bedrock-runtime` (Converse + Titan Embeddings + Titan Image).
+- **AWS:** solo `bedrock-runtime` (Converse + Titan Embeddings + Stable Image Core). Titan
+  Image Generator (v1/v2) llegó a fin de vida y Nova Canvas quedó sin acceso habilitado
+  para esta cuenta; la generación de imágenes usa `stability.stable-image-core-v1:1` en
+  `us-west-2` (`BEDROCK_IMAGE_REGION`), región distinta a `BEDROCK_REGION` (Converse/
+  embeddings en `us-east-1`).
 
 ## 2. Tres niveles y dos superficies de chat
 

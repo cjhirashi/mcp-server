@@ -1,8 +1,8 @@
 """
 Pipeline de imágenes del agente Visual — especificación por propósito
 (agentes/proyectos/publicaciones) y post-proceso Pillow compartido por el
-flujo de generación (Titan) y el de "guardar imagen ya existente". Ver
-ADR-010.
+flujo de generación (Stable Image Core) y el de "guardar imagen ya
+existente". Ver ADR-010.
 """
 import io
 import re
@@ -41,20 +41,20 @@ def resolve_purpose(purpose: str) -> PurposeSpec:
 
 
 # ============================================================================
-# Dimensiones de generación Titan
+# aspect_ratio de generación — Stable Image Core
 # ============================================================================
-# Titan Image Generator exige ancho/alto múltiplos de 64 (rango 320-4096).
-# 500 y 1080 no lo son, así que se genera al múltiplo de 64 más cercano por
-# abajo y el recorte/ajuste a la medida exacta lo hace finalize_png().
-_TITAN_STEP = 64
-_TITAN_MIN = 320
+# Stable Image Core no acepta ancho/alto libres, solo un aspect_ratio de un
+# set fijo. Se elige el más cercano a spec.width/height y el recorte a la
+# medida exacta lo hace finalize_png() después.
+_STABILITY_RATIOS = {
+    "16:9": 16 / 9, "21:9": 21 / 9, "1:1": 1.0, "2:3": 2 / 3, "3:2": 3 / 2,
+    "4:5": 4 / 5, "5:4": 5 / 4, "9:16": 9 / 16, "9:21": 9 / 21,
+}
 
 
-def titan_generation_dims(spec: PurposeSpec) -> tuple[int, int]:
-    def snap(n: int) -> int:
-        return max(_TITAN_MIN, (n // _TITAN_STEP) * _TITAN_STEP)
-
-    return snap(spec.width), snap(spec.height)
+def stability_aspect_ratio(spec: PurposeSpec) -> str:
+    target = spec.width / spec.height
+    return min(_STABILITY_RATIOS, key=lambda name: abs(_STABILITY_RATIOS[name] - target))
 
 
 # ============================================================================

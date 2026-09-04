@@ -493,7 +493,6 @@ async def chat_stream(
 
     # 4. Determinar tipo de sesión y cargar historial de conversación
     session_type = "general" if req.chat_surface == "general" else "contextual"
-    conversation = None
     include_history = record_history if load_session_history is None else load_session_history
     if include_history:
         history = await history_manager.load_converse_messages(db, user_id, req.session_id, runtime.history_window)
@@ -503,6 +502,7 @@ async def chat_stream(
     messages = history + [{"role": "user", "content": user_content}]
 
     # 5. Registrar o crear la conversación en la base de datos si corresponde
+    conversation_id: Optional[str] = None
     if record_history:
         conversation = await history_manager.get_or_create_conversation(
             db,
@@ -512,6 +512,13 @@ async def chat_stream(
             session_type=session_type,
             agent_profile_id=profile.id,
         )
+        # Capturado ya (objeto recién cargado/creado, sin riesgo de atributo
+        # expirado). El resto del turno guarda solo el id: una tool fallida en
+        # este turno (directa o vía delegate_to_specialist, misma sesión
+        # compartida) dispara un db.rollback() que expira `conversation` — tocar
+        # `conversation.id` más tarde revienta con MissingGreenlet (ver
+        # history_manager.append_message).
+        conversation_id = conversation.id
 
     # 6. Inicializar variables para recursos afectados, control de uso de tokens, rondas y delegaciones
     affected: List[str] = []
@@ -638,9 +645,9 @@ async def chat_stream(
             # siguiente turno.
             final_reply = result["text"] or "(sin texto)"
             # 9.2. Registrar mensajes en historial si corresponde
-            if record_history and conversation:
-                await history_manager.append_message(db, conversation, "user", req.message or "(sin texto)")
-                await history_manager.append_message(db, conversation, "assistant", final_reply)
+            if record_history and conversation_id:
+                await history_manager.append_message(db, conversation_id, "user", req.message or "(sin texto)")
+                await history_manager.append_message(db, conversation_id, "assistant", final_reply)
             # 9.3. Emitir evento "done" con respuesta final y los recursos afectados
             yield {"type": "done", "reply": final_reply, "affected_resources": affected}
             return
