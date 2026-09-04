@@ -37,6 +37,7 @@ _TOOL_STATUS = {
     "get_career_record": "Consultando el registro...",
     "create_career_record": "Creando el registro...",
     "update_career_record": "Actualizando el registro...",
+    "bulk_update_career_record": "Actualizando varios registros...",
     "delete_career_record": "Eliminando el registro...",
     "list_recent_changes": "Consultando la bitácora...",
     "restore_deleted_record": "Restaurando el registro...",
@@ -86,15 +87,20 @@ _USER_PROCEED = re.compile(
 )
 _ASSISTANT_WRITE_CLAIM = re.compile(
     r"(?i)("
-    r"ahora actualizo|ahora guardo|ahora escribo|"
-    r"voy a (actualizar|guardar|escribir|crear|documentar)|"
-    r"procedo a (actualizar|guardar|escribir)|"
+    r"ahora (actualizo|guardo|escribo|creo|reclasifico|clasifico|modifico|"
+    r"cambio|reorganizo|muevo|asigno)|"
+    r"voy a (actualizar|guardar|escribir|crear|documentar|reclasificar|clasificar|"
+    r"modificar|cambiar|reorganizar|mover|asignar)|"
+    r"procedo a (actualizar|guardar|escribir|reclasificar|clasificar|modificar)|"
     r"actualizo\s+(\*\*)?(opm|pds|pdt|cvv|clv)-|"
-    r"actualizando (el |la )?(registro|metodolog|plantilla|estilo|gu[ií]a|contenido)|"
-    r"guardando (el |la )?(registro|metodolog)"
+    r"(actualizando|reclasificando|clasificando|modificando|reorganizando|"
+    r"asignando)\s+(el |la |los |las |cada |todas? )"
     r")"
 )
-_USER_INTENT_NUDGE_PROFILES = frozenset({AGENT_PDF_DESIGN, AGENT_METHODOLOGIES})
+# Se evalúa para cualquier L2 con write_enabled (no solo PDF/metodologías): un
+# "hazlo"/"adelante" del usuario tras intención de escritura es la misma señal
+# en cualquier dominio, y restringirlo a 2 perfiles dejaba sin nudge al resto
+# (bug real: se reportó en agent_professional_identity).
 
 _PDF_PERSIST_NUDGE = (
     "Eso quedó solo en el chat: PostgreSQL no se actualizó. "
@@ -113,8 +119,11 @@ _METHODOLOGIES_PERSIST_NUDGE = (
 _GENERIC_PERSIST_NUDGE = (
     "Eso quedó solo en el chat: PostgreSQL no se actualizó. "
     "Llama ahora create_career_record o update_career_record con resource_key, "
-    "record_id si aplica, y fields. No afirmes que lo guardaste hasta que la tool "
-    "devuelva el id."
+    "record_id si aplica, y fields. Si el cambio afecta varios registros del mismo "
+    "resource_key (p.ej. reclasificar todas las X), usa bulk_update_career_record con "
+    "resource_key y updates=[{record_id, fields}, ...] en vez de llamar update_career_record "
+    "una por una — hazlo ahora, en este turno, no lo anuncies solamente. No afirmes que lo "
+    "guardaste hasta que la tool devuelva el id o los ids."
 )
 
 
@@ -145,8 +154,6 @@ def should_nudge_persist(
     head = (assistant_text or "")[:400]
     if _ASSISTANT_WRITE_CLAIM.search(head):
         return True
-    if profile_id not in _USER_INTENT_NUDGE_PROFILES:
-        return False
     text = user_message or ""
     return bool(_USER_WRITE_INTENT.search(text) or _USER_PROCEED.search(text))
 

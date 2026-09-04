@@ -59,7 +59,11 @@ _L2_DOMAIN_RULE = (
     "Si preguntan CUÁNTOS hay, llama count_career_records. "
     "Redactar en el chat no persiste: usa create_career_record o update_career_record "
     "(en diseño PDF: pdf_style / pdf_template). No afirmes que guardaste hasta que la tool "
-    "devuelva el id. Si el usuario confirma (procede, adelante, hazlo), llama la tool en este turno."
+    "devuelva el id. Si el usuario confirma (procede, adelante, hazlo), llama la tool en este turno. "
+    "Si el cambio toca varios registros del mismo resource_key (ej. reclasificar todas las "
+    "competencias en categorías nuevas), NO los anuncies uno por uno en texto: llama "
+    "bulk_update_career_record con resource_key y updates=[{record_id, fields}, ...] en el mismo "
+    "turno en que lo confirmas. 'Voy a actualizar cada uno' sin llamar la tool no cuenta como hecho."
 )
 
 _L3_TASK_RULE = (

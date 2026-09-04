@@ -75,6 +75,35 @@ _RAW_TOOLS: List[Dict[str, Any]] = [
     {"name": "get_career_record", "description": "Obtiene un registro por id. En registros grandes (p.ej. projects, cv-versions) pasa 'fields' con solo las columnas que necesitas para no traer todo el registro; el id siempre se incluye. Si no sabes los nombres exactos, usa describe_resource_schema primero.", "schema": {"type": "object", "properties": {"resource_key": _RESOURCE_KEY_PARAM, "record_id": _RECORD_ID_PARAM, "fields": {"type": "array", "items": {"type": "string"}, "description": "Opcional. Columnas a devolver (id siempre incluido)."}}, "required": ["resource_key", "record_id"]}},
     {"name": "create_career_record", "description": "Crea registro. Escribir el contenido en el chat NO guarda: llama esta tool con resource_key y fields.", "schema": {"type": "object", "properties": {"resource_key": _RESOURCE_KEY_PARAM, "fields": {"type": "object"}}, "required": ["resource_key", "fields"]}},
     {"name": "update_career_record", "description": "Actualiza registro. Escribir el contenido en el chat NO guarda: llama esta tool con resource_key, record_id y fields.", "schema": {"type": "object", "properties": {"resource_key": _RESOURCE_KEY_PARAM, "record_id": _RECORD_ID_PARAM, "fields": {"type": "object"}}, "required": ["resource_key", "record_id", "fields"]}},
+    {
+        "name": "bulk_update_career_record",
+        "description": (
+            "Actualiza VARIOS registros del mismo resource_key en una sola llamada "
+            "(ej. reclasificar todas las competencias en 4 categorías). Úsala en vez de "
+            "llamar update_career_record una por una cuando el cambio toca varias filas. "
+            "updates es una lista de {record_id, fields}; máximo 200 por llamada. "
+            "Escribirlo en el chat NO guarda nada — llama esta tool."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "resource_key": _RESOURCE_KEY_PARAM,
+                "updates": {
+                    "type": "array",
+                    "description": "Cada item: {record_id, fields}. fields son las columnas a cambiar en ese registro.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "record_id": _RECORD_ID_PARAM,
+                            "fields": {"type": "object"},
+                        },
+                        "required": ["record_id", "fields"],
+                    },
+                },
+            },
+            "required": ["resource_key", "updates"],
+        },
+    },
     {"name": "delete_career_record", "description": "Elimina registro.", "schema": {"type": "object", "properties": {"resource_key": _RESOURCE_KEY_PARAM, "record_id": _RECORD_ID_PARAM}, "required": ["resource_key", "record_id"]}},
     {"name": "get_linkedin_status", "description": "Estado conexión LinkedIn.", "schema": {"type": "object", "properties": {}}},
     {"name": "list_linkedin_posts", "description": "Cola e historial posts LinkedIn.", "schema": {"type": "object", "properties": {"limit": {"type": "integer"}}}},
@@ -267,6 +296,7 @@ _RAW_TOOLS: List[Dict[str, Any]] = [
 _WRITE_TOOLS = {
     "create_career_record",
     "update_career_record",
+    "bulk_update_career_record",
     "delete_career_record",
     "create_linkedin_post",
     "pdf_template",
@@ -841,6 +871,40 @@ async def _run_error_report_settings(db, tool_input: Dict[str, Any]) -> Dict[str
 
 async def _execute_extended(db, user_id: str, name: str, tool_input: Dict[str, Any], session_id: str) -> Dict[str, Any]:
     """Tools nuevos del harness local (no en monolito legacy)."""
+    if name == "bulk_update_career_record":
+        resource_key = tool_input.get("resource_key")
+        updates = tool_input.get("updates") or []
+        if not resource_key:
+            return {"error": "falta resource_key"}
+        if not updates:
+            return {"error": "updates vacío: pasa al menos un {record_id, fields}"}
+        if len(updates) > 200:
+            return {"error": f"updates trae {len(updates)} items; máximo 200 por llamada"}
+        updated_ids: List[str] = []
+        errors: List[Dict[str, Any]] = []
+        for entry in updates:
+            record_id = entry.get("record_id") if isinstance(entry, dict) else None
+            fields = entry.get("fields") if isinstance(entry, dict) else None
+            if not record_id or not isinstance(fields, dict):
+                errors.append({"record_id": record_id, "error": "falta record_id o fields"})
+                continue
+            result = await bedrock_service._execute_tool(
+                db, user_id, "update_career_record",
+                {"resource_key": resource_key, "record_id": record_id, "fields": fields},
+                session_id,
+            )
+            if isinstance(result, dict) and result.get("error"):
+                errors.append({"record_id": record_id, "error": result["error"]})
+            else:
+                updated_ids.append(record_id)
+        return {
+            "resource_key": resource_key,
+            "updated_count": len(updated_ids),
+            "updated_ids": updated_ids,
+            "error_count": len(errors),
+            "errors": errors,
+        }
+
     if name == "get_linkedin_status":
         conn = await _linkedin_connection(db, user_id)
         if not conn:
@@ -1235,6 +1299,9 @@ def is_write_tool(name: str) -> bool:
 def invalidation_key(name: str, tool_input: Dict[str, Any], tool_result: Dict[str, Any]) -> Optional[str]:
     """Clave para invalidar caché del admin tras un write exitoso (career resource_key o dominio especial)."""
     if tool_result.get("error"):
+        return None
+    if name == "bulk_update_career_record" and not tool_result.get("updated_count"):
+        # Nada se escribió realmente (todos los items fallaron) — no invalidar caché.
         return None
     if tool_input.get("resource_key"):
         return str(tool_input["resource_key"])

@@ -101,6 +101,7 @@ _L2_BASE_TOOL_NAMES = {
     "get_career_record",
     "create_career_record",
     "update_career_record",
+    "bulk_update_career_record",
     "delete_career_record",
 }
 
@@ -138,6 +139,7 @@ _VISUAL_TOOL_NAMES = {
     "list_generated_images",
     "search_knowledge_base",
     "update_career_record",
+    "bulk_update_career_record",
 }
 
 _CHANGELOG_TOOL_NAMES = {
@@ -152,6 +154,7 @@ _TASK_MANAGER_TOOL_NAMES = {
     "get_career_record",
     "create_career_record",
     "update_career_record",
+    "bulk_update_career_record",
     "delete_career_record",
 }
 
@@ -167,6 +170,7 @@ _DOCUMENT_WRITING_TOOL_NAMES = {
     "get_career_record",
     "create_career_record",
     "update_career_record",
+    "bulk_update_career_record",
     "delete_career_record",
 }
 

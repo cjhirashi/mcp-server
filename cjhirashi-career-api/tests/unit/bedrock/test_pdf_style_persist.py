@@ -2,6 +2,7 @@
 from services.bedrock.agent_loop import persist_nudge_text, should_nudge_pdf_persist, should_nudge_persist
 from services.bedrock.agent_profiles import (
     AGENT_METHODOLOGIES,
+    AGENT_ORCHESTRATOR,
     AGENT_PDF_DESIGN,
     AGENT_PROFESSIONAL_IDENTITY,
     get_profile,
@@ -77,7 +78,8 @@ def test_no_nudge_after_successful_write_or_other_profile():
         ["pdf-template-styles"],
         False,
     )
-    assert not should_nudge_pdf_persist(AGENT_PROFESSIONAL_IDENTITY, "genera la guía", [], False)
+    # L1 (orquestador) no tiene CRUD propio: nunca es elegible para el nudge.
+    assert not should_nudge_pdf_persist(AGENT_ORCHESTRATOR, "genera la guía", [], False)
     assert not should_nudge_pdf_persist(AGENT_PDF_DESIGN, "genera la guía", [], True)
     assert not should_nudge_pdf_persist(AGENT_PDF_DESIGN, "¿qué clases tiene pds-1?", [], False)
 
@@ -109,7 +111,28 @@ def test_nudge_methodologies_on_procede_even_without_claim():
     assert not should_nudge_persist(AGENT_METHODOLOGIES, "ok", [], False, "¿en qué te ayudo?")
 
 
-def test_nudge_identity_only_on_assistant_claim():
+def test_nudge_identity_on_assistant_claim():
     claim = "Ahora actualizo ach-17 con la bio nueva."
     assert should_nudge_persist(AGENT_PROFESSIONAL_IDENTITY, "ok", [], False, claim)
-    assert not should_nudge_persist(AGENT_PROFESSIONAL_IDENTITY, "procede", [], False, "")
+
+
+def test_nudge_identity_on_user_proceed_without_claim():
+    # Cualquier L2 write-enabled se beneficia del nudge por intención del
+    # usuario, no solo pdf_design/methodologies (antes quedaba fuera y el
+    # agente podía anunciar un write y no ejecutarlo nunca).
+    assert should_nudge_persist(AGENT_PROFESSIONAL_IDENTITY, "procede", [], False, "")
+
+
+def test_nudge_identity_on_bulk_reclassification_claim():
+    # Regresión: "voy a reclasificar" / "actualizando cada una" no hacían
+    # match con el regex original (solo cubría actualizar/guardar/escribir/
+    # crear/documentar), así que un plan de escritura en lote nunca disparaba
+    # el nudge y el agente se quedaba solo anunciando el trabajo.
+    claim = (
+        "Perfecto. Voy a reclasificar todas las 72 competencias en las 4 categorías "
+        "solicitadas: Técnicas, Blandas, Dominio y Herramientas."
+    )
+    assert should_nudge_persist(AGENT_PROFESSIONAL_IDENTITY, "hazlo ya", [], False, claim)
+    claim2 = "Ahora voy a reclasificar todas las competencias. Actualizando cada una con su categoría:"
+    assert should_nudge_persist(AGENT_PROFESSIONAL_IDENTITY, "hazlo ya", [], False, claim2)
+    assert "bulk_update_career_record" in persist_nudge_text(AGENT_PROFESSIONAL_IDENTITY)
