@@ -8,19 +8,21 @@ subtipo: history
 > Append-only, orden cronológico inverso (lo más reciente arriba). Una entrada
 > Session-End por sesión, con el formato fijo de `method.md §10`.
 
-## [2026-09-06] 003-configuracion-agentes-desde-app — implemented
+## [2026-09-06] 003-configuracion-agentes-desde-app — verified
 
-- **Fase alcanzada:** implement (Specify → Plan → Tasks → Implement completos; falta
-  `verified` = arranque real + deploy).
+- **Fase alcanzada:** verified.
 - **Rebotes del verificador:** 0 (TDD en el mismo hilo; un test con asunción equivocada
   corregido — `agent_pdf_design` no tiene `list_career_record` en su default).
 - **Directiva de Pausa:** no.
-- **Drift / re-anchor:** anchor_commit de 003 aún en `10738d67` (pre-feature); se mueve
-  al commit de cierre.
-- **Anclas movidas:** ninguna (pendiente del commit de cierre).
-- **Gate:** verde (`./.harness/gate/check.sh` → 23 ok · 1 warn · 0 error; warn = drift de
-  003, normal antes de commitear). API `369 passed, 72 skipped` · admin `435 passed` +
-  type-check 0.
+- **Drift / re-anchor:** no — `anchor_commit` movido a `c855a19d`.
+- **Anclas movidas:** spec.md → `c855a19d`.
+- **Gate:** verde (`./.harness/gate/check.sh` → 23 ok · 0 warn · 0 error). API
+  `369 passed, 72 skipped` · admin `435 passed` + type-check 0.
+- **Verificación en vivo (JWT real, usr-2):** `GET /tools/catalog` 200 (41 builtin, 0
+  mcp); `GET tools` default (override=None); `PUT ["pdf_template"]` → override reemplaza +
+  `delegate_to_specialist` añadido; `PUT ["not_a_tool"]` 400; `PUT null` restaura default;
+  `GET perfil desconocido` 404. Migración `f7a8b9c0d1e2` aplicada (`alembic current` =
+  head).
 - **Docs actualizadas:** `docs/09-DECISIONS/026-configuracion-agentes-app.md` (nuevo ADR)
   + índice, `docs/BEDROCK-SYSTEM.md`, `cjhirashi-career-api/docs/sections/bedrock/README.md`,
   `contracts/tools.md`.
@@ -29,9 +31,8 @@ subtipo: history
   `delegate_to_specialist` se aplica por nivel tras el override (D-2); catálogo de tools
   read-only desde `_RAW_TOOLS` + `bedrock_custom_tools`; agentes siguen naciendo en código
   (Opción A); metodologías verificadas sin rediseño (camino ya correcto).
-- **Próximo paso:** commit + deploy (`docker compose build/up` api+admin, `alembic upgrade
-  head`) + verificación en vivo de `GET/PUT /bedrock/agent-profiles/{id}/tools` y
-  `GET /bedrock/tools/catalog`.
+- **Próximo paso:** `git push origin main` (commit `c855a19d` + commit de cierre del
+  anchor) para publicar la feature desplegada.
 
 ## [2026-09-04] 002-generacion-imagenes-agente-visual — verified
 

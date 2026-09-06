@@ -153,11 +153,13 @@ actualizado: 2026-09-04
   Confirmado con `curl` y con un User-Agent de navegador real: ambos `200`. Las
   imágenes generadas sí cargan para cualquier cliente normal (frontend, curl,
   navegador). No se abre mensaje en `caddy.json` — no había nada que reportar.
-- **[2026-09-06] Feature `003-configuracion-agentes-desde-app` — `implemented`.** Override
-  de herramientas por agente (`bedrock_agent_profile_tools`, `GET/PUT
-  /bedrock/agent-profiles/{id}/tools`) + catálogo de tools read-only (`GET
+- **[2026-09-06] Feature `003-configuracion-agentes-desde-app` — `verified` + DESPLEGADA
+  (pendiente de push).** Override de herramientas por agente (`bedrock_agent_profile_tools`,
+  `GET/PUT /bedrock/agent-profiles/{id}/tools`) + catálogo de tools read-only (`GET
   /bedrock/tools/catalog`) + editor de herramientas en el catálogo. Metodologías
-  verificadas sin rediseño (camino ya correcto). Gate `fast` verde (23 ok · 1 warn =
-  drift pre-commit). Falta `verified`: commit + deploy + verificación en vivo. Detalle en
+  verificadas sin rediseño (camino ya correcto). Commits `c855a19d` (feature) + commit de
+  cierre del anchor. Migración `f7a8b9c0d1e2` aplicada en `career_db`. Verificación en vivo
+  con JWT real: catalog 200 (41 tools), override reemplaza + `delegate_to_specialist` por
+  nivel, 400 en tool desconocida, restore a default, 404 en perfil desconocido. Detalle en
   `.harness/specs/003-configuracion-agentes-desde-app/` y en `history.md`.
 - Antes de tocar nada: correr `.harness/gate/check.sh`.

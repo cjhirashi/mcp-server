@@ -1,7 +1,7 @@
 ---
 titulo: Configuración de agentes desde la App (metodologías y herramientas)
 tipo: spec
-estado: implemented
+estado: verified
 fecha: 2026-09-06
 feature_id: "003"
 covers:
@@ -31,7 +31,7 @@ covers:
   - docs/BEDROCK-SYSTEM.md
   - docs/09-DECISIONS/026-configuracion-agentes-app.md
   - .harness/specs/003-configuracion-agentes-desde-app/contracts/tools.md
-anchor_commit: 10738d67
+anchor_commit: c855a19d
 anchor_mode: advisory
 ---
 
