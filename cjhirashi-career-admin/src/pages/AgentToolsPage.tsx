@@ -1,27 +1,12 @@
 import React, { useState } from 'react'
 import { Plug, Plus, Trash2 } from 'lucide-react'
-import { useBedrockTools, useBedrockToolMutations } from '@/hooks/useBedrockChat'
+import { useBedrockTools, useBedrockToolMutations, useBedrockToolsCatalog } from '@/hooks/useBedrockChat'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { getErrorMessage } from '@/utils/errors'
 
-const BUILTIN_TOOLS = [
-  { name: 'describe_resource_schema', description: 'Consulta los nombres de campo reales de un recurso antes de crear/editar.' },
-  { name: 'search_knowledge_base', description: 'Búsqueda semántica Qdrant. type=methodology solo devuelve las asignadas al agente (o compartidas).' },
-  { name: 'list_career_record', description: 'Lista/busca registros de un recurso.' },
-  { name: 'get_career_record', description: 'Obtiene un registro completo por id.' },
-  { name: 'create_career_record', description: 'Crea un registro nuevo.' },
-  { name: 'update_career_record', description: 'Actualiza un registro existente.' },
-  { name: 'delete_career_record', description: 'Elimina un registro.' },
-  { name: 'pdf_template', description: 'CRUD de plantillas HTML (tabla pdf_output_templates). action=list|get|create|update.' },
-  { name: 'pdf_style', description: 'CRUD de estilos CSS (tabla pdf_template_styles). action=list|get|create|update.' },
-  { name: 'generate_pdf', description: 'Genera PDF combinando plantilla HTML + estilo CSS referenciado.' },
-  { name: 'generate_image', description: 'Genera imagen IA (Titan) y sube a MinIO.' },
-  { name: 'create_linkedin_post', description: 'Publica o programa post en LinkedIn.' },
-  { name: 'delegate_to_specialist', description: 'Orquestador delega a un perfil especialista (chat general).' },
-]
-
 export const AgentToolsPage: React.FC = () => {
   const { data: tools, isLoading, isError, error } = useBedrockTools()
+  const { data: toolsCatalog } = useBedrockToolsCatalog()
   const { createMutation, setEnabledMutation, deleteMutation } = useBedrockToolMutations()
 
   const [name, setName] = useState('')
@@ -67,7 +52,7 @@ export const AgentToolsPage: React.FC = () => {
           </div>
           <div className="card-body">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {BUILTIN_TOOLS.map((tool) => (
+              {(toolsCatalog?.builtin ?? []).map((tool) => (
                 <div key={tool.name} className="p-3 rounded-xl bg-glass">
                   <p className="text-sm font-mono text-text">{tool.name}</p>
                   <p className="text-xs text-text-secondary mt-1">{tool.description}</p>

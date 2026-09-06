@@ -32,6 +32,8 @@ from schemas.bedrock import (
     BedrockAgentPhotoResponse,
     BedrockAgentPhotoUpdateRequest,
     BedrockAgentSectionsUpdateRequest,
+    BedrockAgentToolsState,
+    BedrockAgentToolsUpdateRequest,
     BedrockAuditLogResponse,
     BedrockChatRequest,
     BedrockConversationMessageResponse,
@@ -48,6 +50,7 @@ from schemas.bedrock import (
     BedrockModelOption,
     BedrockModelStatusResponse,
     BedrockModelSwitchRequest,
+    BedrockToolCatalogResponse,
     BedrockBudgetStatusResponse,
     BedrockUsageByDay,
     BedrockUsageByModel,
@@ -501,6 +504,48 @@ async def update_agent_methodologies(
 
 
 @router.get(
+    "/agent-profiles/{profile_id}/tools",
+    response_model=BedrockAgentToolsState,
+    summary="Estado de herramientas de un agente (default/override/efectivo)",
+)
+async def get_agent_tools(
+    profile_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from services.bedrock import profile_tools
+
+    try:
+        profile = get_profile(profile_id)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown agent profile")
+    return await profile_tools.get_tool_state(db, profile)
+
+
+@router.put(
+    "/agent-profiles/{profile_id}/tools",
+    response_model=BedrockAgentToolsState,
+    summary="Configura las herramientas que este agente puede usar",
+)
+async def update_agent_tools(
+    profile_id: str,
+    payload: BedrockAgentToolsUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from services.bedrock import profile_tools
+
+    try:
+        get_profile(profile_id)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown agent profile")
+    try:
+        return await profile_tools.set_tool_override(db, profile_id, payload.tool_names)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get(
     "/agent-profiles/{profile_id}/memory",
     response_model=BedrockAgentMemoryResponse,
     summary="Memoria propia del agente (L1/L2: notas + conversaciones)",
@@ -587,6 +632,22 @@ async def list_tools(
     db: AsyncSession = Depends(get_db),
 ):
     return await bedrock_service.list_custom_tools(db)
+
+
+@router.get(
+    "/tools/catalog",
+    response_model=BedrockToolCatalogResponse,
+    summary="Catálogo read-only de herramientas (integradas + MCP)",
+)
+async def get_tools_catalog(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from services.bedrock import profile_tools
+
+    builtin = profile_tools.list_builtin_tool_catalog()
+    mcp = await bedrock_service.list_custom_tools(db)
+    return {"builtin": builtin, "mcp": mcp}
 
 
 @router.post("/tools", response_model=BedrockCustomToolResponse, status_code=status.HTTP_201_CREATED, summary="Register a new MCP tool server")

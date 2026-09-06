@@ -208,6 +208,9 @@ export interface BedrockAgentCatalogItem {
   sections: BedrockAgentCatalogSection[]
   default_model_id: string | null
   tools: string[]
+  default_tools: string[]
+  override_tools: string[] | null
+  effective_tools: string[]
   has_own_memory: boolean
   default_suffix: string
   override_suffix: string | null
@@ -243,6 +246,23 @@ export interface BedrockCustomTool {
   headers: Record<string, string> | null
   is_enabled: boolean
   created_at: string
+}
+
+export interface BedrockAgentToolsState {
+  profile_id: string
+  default_tools: string[]
+  override_tools: string[] | null
+  effective_tools: string[]
+}
+
+export interface BedrockToolCatalogItem {
+  name: string
+  description: string
+}
+
+export interface BedrockToolCatalog {
+  builtin: BedrockToolCatalogItem[]
+  mcp: BedrockCustomTool[]
 }
 
 // Flexible shape for semantic memory hits from Qdrant (memoryRecordId, content, score, …).

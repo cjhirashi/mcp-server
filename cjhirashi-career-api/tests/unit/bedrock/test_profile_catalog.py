@@ -70,3 +70,23 @@ def test_pdf_design_lists_template_tables():
     assert item["prompt_is_default"] is False
     assert item["has_own_memory"] is True
     assert item["sections"] == []
+
+
+def test_serialize_definition_exposes_tool_state():
+    profile = get_profile(AGENT_PDF_DESIGN)
+    meta = {
+        "default_suffix": "x",
+        "override_suffix": None,
+        "effective_suffix": "x",
+        "is_default": True,
+    }
+    item = _serialize_definition(profile, meta)
+    assert item["override_tools"] is None
+    assert item["effective_tools"] == item["default_tools"]
+    assert item["tools"] == item["effective_tools"]
+
+    override = ["pdf_template", "pdf_style"]
+    item2 = _serialize_definition(profile, meta, None, override)
+    assert item2["override_tools"] == sorted(override)
+    assert "delegate_to_specialist" in item2["effective_tools"]
+    assert item2["tools"] == item2["effective_tools"]

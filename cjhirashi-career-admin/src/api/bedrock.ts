@@ -12,6 +12,8 @@ import {
   BedrockAgentCatalogMethodology,
   BedrockAgentMemory,
   BedrockAgentNote,
+  BedrockAgentToolsState,
+  BedrockToolCatalog,
   BedrockMemoryEvent,
   BedrockMemoryRecord,
   BedrockModelStatus,
@@ -271,6 +273,34 @@ export const bedrockApi = {
       { methodology_ids: methodologyIds },
       { timeout: CONTROL_PLANE_TIMEOUT_MS }
     )
+    return response.data
+  },
+
+  getAgentTools: async (profileId: string): Promise<BedrockAgentToolsState> => {
+    const response = await axiosInstance.get<BedrockAgentToolsState>(
+      `/bedrock/agent-profiles/${profileId}/tools`,
+      { timeout: CONTROL_PLANE_TIMEOUT_MS }
+    )
+    return response.data
+  },
+
+  /** `toolNames: null` restores the code default for that profile. */
+  updateAgentTools: async (
+    profileId: string,
+    toolNames: string[] | null
+  ): Promise<BedrockAgentToolsState> => {
+    const response = await axiosInstance.put<BedrockAgentToolsState>(
+      `/bedrock/agent-profiles/${profileId}/tools`,
+      { tool_names: toolNames },
+      { timeout: CONTROL_PLANE_TIMEOUT_MS }
+    )
+    return response.data
+  },
+
+  listToolsCatalog: async (): Promise<BedrockToolCatalog> => {
+    const response = await axiosInstance.get<BedrockToolCatalog>('/bedrock/tools/catalog', {
+      timeout: CONTROL_PLANE_TIMEOUT_MS,
+    })
     return response.data
   },
 

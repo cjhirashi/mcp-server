@@ -49,6 +49,9 @@ const sampleAgent: BedrockAgentCatalogItem = {
   resource_keys: ['pdf-output-templates', 'pdf-template-styles'],
   default_model_id: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
   tools: ['pdf_style', 'pdf_template', 'search_knowledge_base', 'delegate_to_specialist'],
+  default_tools: ['pdf_style', 'pdf_template', 'search_knowledge_base', 'delegate_to_specialist'],
+  override_tools: null,
+  effective_tools: ['pdf_style', 'pdf_template', 'search_knowledge_base', 'delegate_to_specialist'],
   has_own_memory: true,
   default_suffix: 'Eres PDF Maker',
   override_suffix: null,
@@ -109,6 +112,14 @@ describe('AgentCatalogPage', () => {
       notes: [{ id: '11', text: 'Usar paleta cyan' }],
     })
     mockedApi.listConversations.mockResolvedValue([])
+    mockedApi.listToolsCatalog.mockResolvedValue({
+      builtin: [
+        { name: 'pdf_template', description: 'CRUD de plantillas' },
+        { name: 'pdf_style', description: 'CRUD de estilos' },
+        { name: 'search_knowledge_base', description: 'Búsqueda semántica' },
+      ],
+      mcp: [],
+    })
     mockedSections.list.mockResolvedValue([
       {
         id: 'sec-16',

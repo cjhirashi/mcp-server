@@ -373,6 +373,25 @@ export function useAgentMethodologiesUpdate() {
   })
 }
 
+export function useAgentToolsUpdate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ profileId, toolNames }: { profileId: string; toolNames: string[] | null }) =>
+      bedrockApi.updateAgentTools(profileId, toolNames),
+    onSuccess: (_data, { profileId }) => {
+      queryClient.invalidateQueries({ queryKey: ['bedrock', 'agent-catalog'] })
+      queryClient.invalidateQueries({ queryKey: ['bedrock', 'agent-catalog', profileId] })
+    },
+  })
+}
+
+export function useBedrockToolsCatalog() {
+  return useQuery({
+    queryKey: ['bedrock', 'tools-catalog'],
+    queryFn: bedrockApi.listToolsCatalog,
+  })
+}
+
 export function useAgentDelegationUpdate() {
   const queryClient = useQueryClient()
   return useMutation({

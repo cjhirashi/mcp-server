@@ -21,8 +21,10 @@ import {
   useAgentMethodologiesUpdate,
   useAgentPhotoUpdate,
   useAgentSectionsUpdate,
+  useAgentToolsUpdate,
   useBedrockAgentProfilePromptUpdate,
   useBedrockConversations,
+  useBedrockToolsCatalog,
 } from '@/hooks/useBedrockChat'
 import { useAdminSections } from '@/hooks/useAdminSections'
 import { getErrorMessage } from '@/utils/errors'
@@ -552,11 +554,14 @@ const AgentCatalogEditors: React.FC<{
   const delegationUpdate = useAgentDelegationUpdate()
   const sectionsUpdate = useAgentSectionsUpdate()
   const photoUpdate = useAgentPhotoUpdate()
+  const toolsUpdate = useAgentToolsUpdate()
+  const { data: toolsCatalog } = useBedrockToolsCatalog()
   const notes = useAgentMemoryNoteMutations(profileId)
   const [promptDraft, setPromptDraft] = useState('')
   const [selectedMethodologyIds, setSelectedMethodologyIds] = useState<string[]>([])
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([])
   const [selectedDelegateIds, setSelectedDelegateIds] = useState<string[]>([])
+  const [selectedToolNames, setSelectedToolNames] = useState<string[]>([])
   const [noteDraft, setNoteDraft] = useState('')
 
   useEffect(() => {
@@ -566,6 +571,12 @@ const AgentCatalogEditors: React.FC<{
       setSelectedMethodologyIds(source.filter((row) => row.assigned).map((row) => row.id))
       setSelectedSectionIds((data.sections ?? []).map((row) => row.id))
       setSelectedDelegateIds(data.delegation_target_ids ?? [])
+      const editableDefault = (data.default_tools ?? []).filter((t) => t !== 'delegate_to_specialist')
+      const editableOverride =
+        data.override_tools === null
+          ? null
+          : data.override_tools.filter((t) => t !== 'delegate_to_specialist')
+      setSelectedToolNames((editableOverride ?? editableDefault).slice().sort())
     }
   }, [data])
 
@@ -594,6 +605,14 @@ const AgentCatalogEditors: React.FC<{
     return allAgentSelectOptions().filter((opt) => allowed.has(opt.value))
   }, [data])
 
+  const toolOptions = useMemo(
+    () =>
+      (toolsCatalog?.builtin ?? [])
+        .filter((t) => t.name !== 'delegate_to_specialist')
+        .map((t) => ({ value: t.name, label: t.name })),
+    [toolsCatalog]
+  )
+
   const promptDirty = data !== undefined && promptDraft !== data.effective_suffix
   const assignedIds = (data?.methodologies ?? data?.assigned_methodologies ?? [])
     .filter((row) => row.assigned)
@@ -607,6 +626,13 @@ const AgentCatalogEditors: React.FC<{
   const delegationDirty =
     selectedDelegateIds.slice().sort().join(',') !==
     (data?.delegation_target_ids ?? []).slice().sort().join(',')
+  const toolsEditableDefault = (data?.default_tools ?? []).filter((t) => t !== 'delegate_to_specialist')
+  const toolsEditableOverride =
+    data?.override_tools === null
+      ? null
+      : (data?.override_tools ?? []).filter((t) => t !== 'delegate_to_specialist')
+  const toolsInitial = (toolsEditableOverride ?? toolsEditableDefault).slice().sort().join(',')
+  const toolsDirty = selectedToolNames.slice().sort().join(',') !== toolsInitial
 
   if (!data && isLoading) {
     return <LoadingSpinner fullScreen={false} message="Cargando agente..." />
@@ -663,8 +689,45 @@ const AgentCatalogEditors: React.FC<{
         )}
       </EditorBlock>
 
-      <EditorBlock title="Herramientas">
-        <ChipList items={data.tools} empty="Sin tools." />
+      <EditorBlock
+        title="Herramientas"
+        editable
+        actions={
+          <>
+            <IconAction
+              label="Guardar herramientas"
+              disabled={!toolsDirty || toolsUpdate.isPending}
+              onClick={() =>
+                toolsUpdate.mutate({ profileId: data.profile_id, toolNames: selectedToolNames })
+              }
+            >
+              <Save size={13} aria-hidden="true" />
+            </IconAction>
+            <IconAction
+              label="Restablecer al código"
+              muted
+              disabled={data.override_tools === null || toolsUpdate.isPending}
+              onClick={() => toolsUpdate.mutate({ profileId: data.profile_id, toolNames: null })}
+            >
+              <RotateCcw size={13} aria-hidden="true" />
+            </IconAction>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          Tools que este agente puede invocar. <code>delegate_to_specialist</code> se gestiona por
+          nivel y no aparece aquí. Guardar reemplaza el set por defecto; Restablecer vuelve al código.
+        </p>
+        <ThemedMultiSelect
+          aria-label="Herramientas de este agente"
+          value={selectedToolNames}
+          onChange={setSelectedToolNames}
+          options={toolOptions}
+          placeholder="— Selecciona herramientas —"
+        />
+        {toolsUpdate.isError && (
+          <p className="text-red-600 dark:text-red-400 text-xs">{getErrorMessage(toolsUpdate.error)}</p>
+        )}
       </EditorBlock>
 
       {data.can_delegate && (

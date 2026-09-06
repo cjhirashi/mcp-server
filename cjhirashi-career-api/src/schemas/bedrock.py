@@ -192,6 +192,9 @@ class BedrockAgentCatalogItem(BaseModel):
     sections: List[BedrockAgentCatalogSection] = []
     default_model_id: Optional[str] = None
     tools: List[str]
+    default_tools: List[str] = []
+    override_tools: Optional[List[str]] = None
+    effective_tools: List[str] = []
     has_own_memory: bool
     default_suffix: str
     override_suffix: Optional[str] = None
@@ -232,6 +235,24 @@ class BedrockAgentSectionsUpdateRequest(BaseModel):
     section_ids: List[str]
 
 
+class BedrockAgentToolsUpdateRequest(BaseModel):
+    """`tool_names=None` restaura el default de código (RF-002)."""
+
+    tool_names: Optional[List[str]] = None
+
+
+class BedrockAgentToolsState(BaseModel):
+    profile_id: str
+    default_tools: List[str]
+    override_tools: Optional[List[str]] = None
+    effective_tools: List[str]
+
+
+class BedrockToolCatalogItem(BaseModel):
+    name: str
+    description: str
+
+
 class BedrockAgentNote(BaseModel):
     id: str
     text: str
@@ -264,6 +285,11 @@ class BedrockCustomToolResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BedrockToolCatalogResponse(BaseModel):
+    builtin: List[BedrockToolCatalogItem]
+    mcp: List[BedrockCustomToolResponse]
 
 
 # ============================================================================

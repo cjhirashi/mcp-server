@@ -485,8 +485,12 @@ async def chat_stream(
         db, profile, req.page_context, user_id=user_id, delegate_ids=allowed_delegate_ids
     )
 
-    # 3. Determinar herramientas permitidas para el perfil, y construir especificaciones de herramientas
-    allowed = agent_profiles.tools_for_profile(profile, tools.all_tool_names())
+    # 3. Determinar herramientas permitidas para el perfil (override Admin si existe),
+    #    y construir especificaciones de herramientas — una sola resolución por turno.
+    from services.bedrock import profile_tools
+
+    tool_override = await profile_tools.get_tool_override(db, profile.id)
+    allowed = profile_tools.effective_tool_names(profile, tool_override)
     tool_specs = tools.converse_tool_specs(
         allowed, caller_profile=profile, delegate_ids=allowed_delegate_ids
     )

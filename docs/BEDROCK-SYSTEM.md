@@ -33,6 +33,12 @@ contextual y el turno degrada al orquestador.
 
 Definidos en `cjhirashi-career-api/src/services/bedrock/agent_profiles.py`.
 
+**Configuración desde la App:** prompt, memoria, metodologías, delegación, secciones, foto
+y — desde ADR-026 — **herramientas** son editables en el Catálogo de Agentes
+(`/settings/agents`) como overrides en Postgres. Las herramientas usan
+`bedrock_agent_profile_tools` (override que reemplaza el set de código); el catálogo
+read-only de tools está en `GET /bedrock/tools/catalog`.
+
 ## 4. Variables de entorno
 
 Ver `.env.example` — `BEDROCK_DEFAULT_MODEL_ID`, `BEDROCK_DAILY_BUDGET_USD`, `AWS_ACCESS_KEY_ID`, etc.
@@ -41,6 +47,7 @@ Ver `.env.example` — `BEDROCK_DEFAULT_MODEL_ID`, `BEDROCK_DAILY_BUDGET_USD`, `
 
 - [ADR-008](09-DECISIONS/008-bedrock-harness-local.md)
 - [ADR-012](09-DECISIONS/012-bedrock-three-level-agents.md)
+- [ADR-026](09-DECISIONS/026-configuracion-agentes-app.md) — configuración de agentes desde la App
 - [cjhirashi-career-api/docs/BEDROCK-HARNESS.md](../cjhirashi-career-api/docs/BEDROCK-HARNESS.md) — IAM y catálogo de modelos
 - [cjhirashi-career-api/docs/sections/bedrock/README.md](../cjhirashi-career-api/docs/sections/bedrock/README.md)
 - [cjhirashi-career-admin/docs/BEDROCK-CHAT.md](../cjhirashi-career-admin/docs/BEDROCK-CHAT.md)

@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.bedrock_conversation import BedrockConversation
-from services.bedrock import profile_delegation, profile_prompts, tools as bedrock_tools
+from services.bedrock import profile_delegation, profile_prompts, profile_tools, tools as bedrock_tools
 from services.bedrock.agent_profiles import (
     AgentProfile,
     agent_record_id,
@@ -45,7 +45,12 @@ def _methodology_entries(rows: Sequence[Any], profile_id: str) -> List[Dict[str,
     return items
 
 
-def _serialize_definition(profile: AgentProfile, prompt_meta: dict, photo_url: Optional[str] = None) -> Dict[str, Any]:
+def _serialize_definition(
+    profile: AgentProfile,
+    prompt_meta: dict,
+    photo_url: Optional[str] = None,
+    tool_override: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     return {
         "id": agent_record_id(profile.id),
         "system_name": profile.id,
@@ -59,7 +64,10 @@ def _serialize_definition(profile: AgentProfile, prompt_meta: dict, photo_url: O
         "resource_keys": _resource_keys(profile),
         "sections": [],
         "default_model_id": profile.default_model_id,
-        "tools": resolved_tool_names(profile),
+        "tools": sorted(profile_tools.effective_tool_names(profile, tool_override)),
+        "default_tools": sorted(profile_tools.default_tool_names(profile)),
+        "override_tools": sorted(tool_override) if tool_override is not None else None,
+        "effective_tools": sorted(profile_tools.effective_tool_names(profile, tool_override)),
         "has_own_memory": profile.user_facing,
         "default_suffix": prompt_meta["default_suffix"],
         "override_suffix": prompt_meta["override_suffix"],
@@ -144,9 +152,15 @@ async def list_catalog(db: AsyncSession, user_id: str) -> List[Dict[str, Any]]:
         owner = row.get("agent_profile_id")
         if owner:
             owned_by_agent.setdefault(owner, []).append(row)
+    tool_overrides = await profile_tools.list_tool_overrides(db)
     items: List[Dict[str, Any]] = []
     for profile in list_profiles():
-        item = _serialize_definition(profile, prompts[profile.id], photos.get(profile.id))
+        item = _serialize_definition(
+            profile,
+            prompts[profile.id],
+            photos.get(profile.id),
+            tool_overrides.get(profile.id),
+        )
         item["conversation_count"] = conv_counts.get(profile.id, 0)
         _attach_sections(item, owned_by_agent.get(profile.id, []))
         _attach_delegation(item, delegation[profile.id])
@@ -169,7 +183,8 @@ async def get_catalog_item(
     rows = await _methodology_rows(db, user_id)
     conv_counts = await _conversation_counts(db, user_id)
     delegation = await profile_delegation.list_delegation_state(db)
-    item = _serialize_definition(profile, prompt_meta, photos.get(profile.id))
+    tool_override = await profile_tools.get_tool_override(db, profile.id)
+    item = _serialize_definition(profile, prompt_meta, photos.get(profile.id), tool_override)
     item["conversation_count"] = conv_counts.get(profile.id, 0)
     owned = [row for row in await list_admin_sections(db) if row.get("agent_profile_id") == profile.id]
     _attach_sections(item, owned)

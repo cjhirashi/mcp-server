@@ -8,6 +8,31 @@ subtipo: history
 > Append-only, orden cronológico inverso (lo más reciente arriba). Una entrada
 > Session-End por sesión, con el formato fijo de `method.md §10`.
 
+## [2026-09-06] 003-configuracion-agentes-desde-app — implemented
+
+- **Fase alcanzada:** implement (Specify → Plan → Tasks → Implement completos; falta
+  `verified` = arranque real + deploy).
+- **Rebotes del verificador:** 0 (TDD en el mismo hilo; un test con asunción equivocada
+  corregido — `agent_pdf_design` no tiene `list_career_record` en su default).
+- **Directiva de Pausa:** no.
+- **Drift / re-anchor:** anchor_commit de 003 aún en `10738d67` (pre-feature); se mueve
+  al commit de cierre.
+- **Anclas movidas:** ninguna (pendiente del commit de cierre).
+- **Gate:** verde (`./.harness/gate/check.sh` → 23 ok · 1 warn · 0 error; warn = drift de
+  003, normal antes de commitear). API `369 passed, 72 skipped` · admin `435 passed` +
+  type-check 0.
+- **Docs actualizadas:** `docs/09-DECISIONS/026-configuracion-agentes-app.md` (nuevo ADR)
+  + índice, `docs/BEDROCK-SYSTEM.md`, `cjhirashi-career-api/docs/sections/bedrock/README.md`,
+  `contracts/tools.md`.
+- **Decisiones de diseño / límites de integración:** override de tools = reemplazo total
+  (`bedrock_agent_profile_tools.tool_names` JSONB nullable) análogo al prompt suffix;
+  `delegate_to_specialist` se aplica por nivel tras el override (D-2); catálogo de tools
+  read-only desde `_RAW_TOOLS` + `bedrock_custom_tools`; agentes siguen naciendo en código
+  (Opción A); metodologías verificadas sin rediseño (camino ya correcto).
+- **Próximo paso:** commit + deploy (`docker compose build/up` api+admin, `alembic upgrade
+  head`) + verificación en vivo de `GET/PUT /bedrock/agent-profiles/{id}/tools` y
+  `GET /bedrock/tools/catalog`.
+
 ## [2026-09-04] 002-generacion-imagenes-agente-visual — verified
 
 - **Fase alcanzada:** verified
