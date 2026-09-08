@@ -49,7 +49,7 @@ covers:
   - docs/09-DECISIONS/026-configuracion-agentes-app.md
   - .harness/specs/003-configuracion-agentes-desde-app/contracts/tools.md
   - .harness/specs/003-configuracion-agentes-desde-app/contracts/knowledge-base.md
-anchor_commit: c855a19d
+anchor_commit: a3b4004a
 anchor_mode: strict
 ---
 
