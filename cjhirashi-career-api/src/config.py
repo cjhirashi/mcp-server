@@ -103,6 +103,14 @@ class Settings(BaseSettings):
     BEDROCK_IMAGE_MODEL_ID: str = "stability.stable-image-core-v1:1"
     BEDROCK_MAX_IMAGES_PER_DAY: int = 20
     BEDROCK_MAX_TOOL_RESULT_CHARS: int = 8000
+    # Presupuesto propio para leer UNA metodología operativa entera con
+    # get_career_record (resource_key=operational-methodologies). Una
+    # metodología es un procedimiento que el agente debe seguir paso a paso;
+    # el tope global (8k) la parte a la mitad (opm-61 ≈ 15,6k). Se paga solo
+    # cuando el agente lee una, no cada turno. Patrón buscar→leer: search
+    # type=methodology devuelve extractos, esto trae la elegida completa.
+    # Spec 003 (Bloque J), D-12.
+    BEDROCK_MAX_METHODOLOGY_RESULT_CHARS: int = 24000
     # inferenceConfig.maxTokens de cada llamada Converse. El default de boto3/
     # Converse (4096) se corta a mitad de un tool_use grande (p.ej.
     # bulk_update_career_record con 60+ items): Bedrock descarta el bloque de

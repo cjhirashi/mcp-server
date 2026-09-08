@@ -1289,6 +1289,19 @@ async def _execute_extended(db, user_id: str, name: str, tool_input: Dict[str, A
 # Dispatch de tools
 # ============================================================================
 
+def _result_char_limit(name: str, tool_input: Dict[str, Any]) -> int:
+    """Tope de caracteres del resultado de esta llamada. Leer UNA metodología
+    entera (`get_career_record` sobre `operational-methodologies`) vale su
+    coste: recibe `BEDROCK_MAX_METHODOLOGY_RESULT_CHARS` en vez del tope
+    global (spec 003 Bloque J, RF-017)."""
+    if (
+        name == "get_career_record"
+        and tool_input.get("resource_key") == "operational-methodologies"
+    ):
+        return settings.BEDROCK_MAX_METHODOLOGY_RESULT_CHARS
+    return settings.BEDROCK_MAX_TOOL_RESULT_CHARS
+
+
 async def execute_tool(
     db,
     user_id: str,
@@ -1304,7 +1317,7 @@ async def execute_tool(
         )
     else:
         result = await _execute_extended(db, user_id, name, tool_input, session_id)
-    return truncate_tool_result(result)
+    return truncate_tool_result(result, limit=_result_char_limit(name, tool_input))
 
 
 def is_write_tool(name: str) -> bool:

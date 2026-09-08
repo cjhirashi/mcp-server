@@ -153,13 +153,37 @@ actualizado: 2026-09-04
   Confirmado con `curl` y con un User-Agent de navegador real: ambos `200`. Las
   imágenes generadas sí cargan para cualquier cliente normal (frontend, curl,
   navegador). No se abre mensaje en `caddy.json` — no había nada que reportar.
-- **[2026-09-06] Feature `003-configuracion-agentes-desde-app` — `verified` + DESPLEGADA
-  (pendiente de push).** Override de herramientas por agente (`bedrock_agent_profile_tools`,
-  `GET/PUT /bedrock/agent-profiles/{id}/tools`) + catálogo de tools read-only (`GET
-  /bedrock/tools/catalog`) + editor de herramientas en el catálogo. Metodologías
-  verificadas sin rediseño (camino ya correcto). Commits `c855a19d` (feature) + commit de
-  cierre del anchor. Migración `f7a8b9c0d1e2` aplicada en `career_db`. Verificación en vivo
-  con JWT real: catalog 200 (41 tools), override reemplaza + `delegate_to_specialist` por
-  nivel, 400 en tool desconocida, restore a default, 404 en perfil desconocido. Detalle en
-  `.harness/specs/003-configuracion-agentes-desde-app/` y en `history.md`.
+- **[2026-09-06] Feature `003` (frentes 1–3) — `verified`.** Override de herramientas por
+  agente (`bedrock_agent_profile_tools`, `GET/PUT /bedrock/agent-profiles/{id}/tools`) +
+  catálogo de tools read-only (`GET /bedrock/tools/catalog`) + editor. Commit `c855a19d`.
+  Migración `f7a8b9c0d1e2` aplicada. Detalle en `history.md`.
+- **[2026-09-07] Feature `003` — REABIERTA (Bloque F) y re-cerrada `verified`.** El Bloque F
+  ("adopción de metodologías") se había cerrado en falso con tests mockeados: en vivo el
+  agente seguía sin reconocer metodologías. **Causa raíz:** índice Qdrant `career_knowledge`
+  stale por una migración de IDs (enteros→`usr-2`/`opm-33`) nunca re-indexada — `_point_id`
+  deriva de `resource_key:record_id` → dos generaciones acumuladas; `search` filtra
+  `user_id` exacto y solo veía la minoría re-escrita (usr-2: 7 de 23 metodologías; +252
+  huérfanos). **Fix (RF-010..015):** `services/bedrock/knowledge_base.py::reindex_knowledge_base`
+  (idempotente, rebuild real), `POST /bedrock/knowledge-base/reindex` (operador, síncrono),
+  `qdrant_service.purge_orphans` + `prune_stale_points` + borrado del gemelo heredado en
+  `upsert_point`, `RESOURCE_VECTORIZE` vía `register_resource`, `set_agent_methodologies`
+  fuerza reindex, `scripts/check_kb_consistency.py`. API `394 passed`. **Verificado en vivo**
+  (contenedor reconstruido): reindex HTTP 200 → 265 career_record + 24 methodology, 0
+  huérfanos; `check_kb_consistency.py` EXIT 0 (todo cuadra); `search_knowledge_base
+  type=methodology` devuelve por perfil solo lo asignado + compartido, y ahora sí lo devuelve.
+- **[2026-09-07] Feature `003` — Bloque J (lectura selectiva de metodologías) `verified`.**
+  Con el índice sano, el agente recibía la metodología **truncada** (opm-61 = 15,6k > tope
+  tool-results 8k). Modelo correcto: "lee sólo la metodología que ocupa este trabajo,
+  entera". Fix (RF-016/017/018): `search_knowledge_base type=methodology` devuelve
+  **extractos** (`record_id`, `title`, `section`, `excerpt`≤800, `read_full`) — el payload
+  Qdrant de metodologías ahora lleva `title`/`section`; `get_career_record` sobre
+  `operational-methodologies` usa `BEDROCK_MAX_METHODOLOGY_RESULT_CHARS = 24000` (vs global
+  8000) → la metodología entra entera; el system prompt guía "buscar→leer, una por
+  trabajo". API `403 passed`. **Verificado en vivo:** search devuelve extractos sin `text`;
+  `get_career_record opm-61` → 15.611 chars sin truncar. 18 RF, cobertura completa.
+- **[2026-09-07] Pendiente de 003:** commit de cierre en `main` (abarca Bloques I y J) +
+  mover `anchor_commit` de 003 a ese commit + `git push`. El código nuevo YA está
+  desplegado en `cjhirashi-career-api` (imagen reconstruida esta sesión) pero SIN commitear.
+- **Operativa nueva:** tras cualquier migración que toque ids o `user_id`, correr
+  `POST /bedrock/knowledge-base/reindex` y `scripts/check_kb_consistency.py` (ADR-026 §Reapertura).
 - Antes de tocar nada: correr `.harness/gate/check.sh`.

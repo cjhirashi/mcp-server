@@ -166,8 +166,15 @@ Historial en PostgreSQL (`bedrock_conversations`, `bedrock_conversation_messages
 | `GET` | `/bedrock/memory/events` | Eventos de memoria corto plazo (`?session_id=`) |
 | `GET` | `/bedrock/memory/records` | Hechos duraderos semánticos (`?query=`) |
 | `POST` | `/bedrock/memory/manual` | Indexar hecho manual en Qdrant |
+| `POST` | `/bedrock/knowledge-base/reindex` | Reindexa Qdrant desde Postgres y purga huérfanos → `{reindexed, purged_orphans, users}` (síncrono, operador) |
 
 Historial en PostgreSQL; hechos semánticos en Qdrant.
+
+**Consistencia Qdrant ↔ Postgres (ADR-026, reapertura 2026-09-07).** El índice
+`career_knowledge` es una copia derivada de Postgres; una migración de ids/`user_id` sin
+re-indexar lo deja *stale* (el agente "no encuentra" metodologías/registros). `POST
+/bedrock/knowledge-base/reindex` lo reconstruye (idempotente); `scripts/check_kb_consistency.py`
+lo audita sin modificar. Correr ambos tras cualquier migración de ese tipo.
 
 ---
 

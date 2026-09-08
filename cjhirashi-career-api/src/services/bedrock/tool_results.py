@@ -91,9 +91,13 @@ def _cap_record_fields(result: Dict[str, Any], limit: int) -> Optional[Dict[str,
     return capped_item
 
 
-def truncate_tool_result(result: Dict[str, Any]) -> Dict[str, Any]:
-    """Serializa y trunca si supera BEDROCK_MAX_TOOL_RESULT_CHARS."""
-    limit = settings.BEDROCK_MAX_TOOL_RESULT_CHARS
+def truncate_tool_result(result: Dict[str, Any], limit: Optional[int] = None) -> Dict[str, Any]:
+    """Serializa y trunca si supera `limit` (por defecto
+    `BEDROCK_MAX_TOOL_RESULT_CHARS`). El caller pasa un `limit` propio para
+    lecturas que valen su coste — p.ej. una metodología entera
+    (`BEDROCK_MAX_METHODOLOGY_RESULT_CHARS`, spec 003 Bloque J)."""
+    if limit is None:
+        limit = settings.BEDROCK_MAX_TOOL_RESULT_CHARS
     if _serialize_len(result) <= limit:
         return result
 

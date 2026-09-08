@@ -33,6 +33,24 @@ from repositories.career_repository import CareerRepository
 # CareerResourceView.tsx's CAREER_RESOURCES does on the frontend.
 RESOURCE_REGISTRY: Dict[str, Type[Base]] = {}
 
+# resource_key -> whether this resource is indexed in Agent Bedrock's Qdrant
+# knowledge base. Populated alongside RESOURCE_REGISTRY (by `build_crud_router`
+# and by the few sites that build a `CareerRepository` by hand). Single source
+# of truth for "what gets reindexed" - never hand-maintain a separate list.
+# Absent key defaults to True (the `build_crud_router` default).
+RESOURCE_VECTORIZE: Dict[str, bool] = {}
+
+
+def register_resource(resource_key: str, model: Type[Base], *, vectorize: bool = True) -> None:
+    """Register a career resource and its knowledge-base indexing flag.
+
+    Called by `build_crud_router` and by the manual `CareerRepository`
+    construction sites (`cv-versions`, `pdf-*`) so `RESOURCE_VECTORIZE`
+    always mirrors `RESOURCE_REGISTRY`.
+    """
+    RESOURCE_REGISTRY[resource_key] = model
+    RESOURCE_VECTORIZE[resource_key] = vectorize
+
 
 # ============================================================================
 # Factory: build_crud_router
@@ -60,7 +78,7 @@ def build_crud_router(
     router = APIRouter(prefix=prefix, tags=tags)
     resource_key = prefix.lstrip("/")
     repository: CareerRepository = CareerRepository(model, resource_key=resource_key, vectorize=vectorize)
-    RESOURCE_REGISTRY[resource_key] = model
+    register_resource(resource_key, model, vectorize=vectorize)
 
     class CountResponse(BaseModel):
         count: int

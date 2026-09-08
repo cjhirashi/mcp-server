@@ -72,11 +72,19 @@ async def upsert_point(
     text: str,
     vector: List[float],
     extra_payload: Optional[Dict[str, Any]] = None,
+    legacy_record_id: Optional[str] = None,
 ) -> None:
     """Index (or re-index) one record. `resource_type` is `"methodology"` or
     `"career_record"` - `operational_methodologies` goes through the same
     generic path as every other resource, since it's just another table
-    behind `CareerRepository`."""
+    behind `CareerRepository`.
+
+    `legacy_record_id`: when the record's id was migrated from a bare integer
+    to a prefixed form (`33` -> `opm-33`), the pre-migration point lives under
+    a *different* `_point_id` and would otherwise linger forever. Passing the
+    old id here deletes that twin right after the canonical upsert (spec 003
+    RF-013). The full `reindex_knowledge_base` sweep is the backstop for
+    twins this per-write cleanup can't reach."""
     await _ensure_collection(len(vector))
     client = _get_client()
     payload = {
@@ -88,16 +96,98 @@ async def upsert_point(
     }
     if extra_payload:
         payload.update(extra_payload)
+    canonical_id = _point_id(resource_key, record_id)
     await client.upsert(
         collection_name=settings.QDRANT_COLLECTION,
         points=[
             models.PointStruct(
-                id=_point_id(resource_key, record_id),
+                id=canonical_id,
                 vector=vector,
                 payload=payload,
             )
         ],
     )
+    if legacy_record_id is not None and str(legacy_record_id) != str(record_id):
+        legacy_id = _point_id(resource_key, str(legacy_record_id))
+        if legacy_id != canonical_id:
+            await client.delete(
+                collection_name=settings.QDRANT_COLLECTION,
+                points_selector=models.PointIdsList(points=[legacy_id]),
+            )
+
+
+async def prune_stale_points(user_id, resource_key: str, keep_record_ids) -> int:
+    """Delete points for `(user_id, resource_key)` whose `record_id` is not in
+    `keep_record_ids` - rows deleted from Postgres whose best-effort delete
+    hook never reached Qdrant. Makes `reindex_knowledge_base` a true rebuild
+    ("exactamente un punto por cada fila vigente", spec 003 RF-010). Returns
+    the number of points removed."""
+    if not await _collection_exists():
+        return 0
+    client = _get_client()
+    keep = {str(r) for r in keep_record_ids}
+    flt = models.Filter(
+        must=[
+            models.FieldCondition(key="user_id", match=models.MatchValue(value=str(user_id))),
+            models.FieldCondition(key="resource_key", match=models.MatchValue(value=resource_key)),
+        ]
+    )
+    doomed: List[Any] = []
+    offset = None
+    while True:
+        points, offset = await client.scroll(
+            collection_name=settings.QDRANT_COLLECTION,
+            scroll_filter=flt,
+            limit=500,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in points:
+            if str((point.payload or {}).get("record_id")) not in keep:
+                doomed.append(point.id)
+        if offset is None:
+            break
+    for start in range(0, len(doomed), 500):
+        await client.delete(
+            collection_name=settings.QDRANT_COLLECTION,
+            points_selector=models.PointIdsList(points=doomed[start : start + 500]),
+        )
+    return len(doomed)
+
+
+async def purge_orphans(valid_user_ids) -> int:
+    """Delete every point whose payload `user_id` is not a current user id -
+    leftovers from the integer->string user-id migration that `search` (which
+    matches `user_id` exactly) can never return anyway (spec 003 RF-011).
+    Returns the number of points removed. Idempotent: a second call finds
+    nothing and returns 0."""
+    if not await _collection_exists():
+        return 0
+    client = _get_client()
+    valid = {str(u) for u in valid_user_ids}
+    doomed: List[Any] = []
+    offset = None
+    while True:
+        points, offset = await client.scroll(
+            collection_name=settings.QDRANT_COLLECTION,
+            limit=500,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in points:
+            uid = (point.payload or {}).get("user_id")
+            if str(uid) not in valid:
+                doomed.append(point.id)
+        if offset is None:
+            break
+    for start in range(0, len(doomed), 500):
+        await client.delete(
+            collection_name=settings.QDRANT_COLLECTION,
+            points_selector=models.PointIdsList(points=doomed[start : start + 500]),
+        )
+    return len(doomed)
 
 
 async def delete_point(*, resource_key: str, record_id: str) -> None:

@@ -105,7 +105,7 @@ Sustitución `{{variable}}` en HTML de plantillas antes de WeasyPrint.
 
 `list_assigned_methodologies(db, user_id, caller_id)`: títulos vigentes asignados al agente (Admin → Agentes). Se inyecta cada turno en `compose_system_prompt` para que una metodología nueva asignada se asuma sin cambiar código.
 
-`set_agent_methodologies(db, user_id, profile_id, ids)`: asigna desde el catálogo de agentes (Admin). Vacío = compartida; al quitar el último dueño se aparca en `agent_methodologies`.
+`set_agent_methodologies(db, user_id, profile_id, ids)`: asigna desde el catálogo de agentes (Admin). Vacío = compartida; al quitar el último dueño se aparca en `agent_methodologies`. Tras persistir, **fuerza el reindex** de todas las metodologías del usuario en Qdrant (awaited) aunque `agent_profile_ids` no cambie — el catálogo del prompt ya sale de PG, pero `search_knowledge_base` lee del índice y este puede haber driftado (spec 003, RF-014). Ver `bedrock/knowledge_base.py`.
 
 ### `github_service.py`
 

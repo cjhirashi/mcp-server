@@ -455,6 +455,59 @@ class CareerRepository(Generic[ModelType]):
                 lines.append(f"{col}: {value}")
         return "\n".join(lines)
 
+    def _legacy_record_id(self, record_id) -> Optional[str]:
+        """The pre-migration bare-integer id for this record, or None.
+
+        Ids used to be bare integers (`33`) and were migrated to a prefixed
+        form (`opm-33`). The old Qdrant point sits under a different
+        `_point_id`; `upsert_point` uses this to delete that twin (spec 003
+        RF-013). Returns None when `record_id` has no known prefix or isn't
+        the `{prefix}-{int}` shape."""
+        from services.id_generator import prefix_for_key
+
+        if not self.resource_key or not isinstance(record_id, str):
+            return None
+        prefix = prefix_for_key(self.resource_key)
+        if not prefix:
+            return None
+        head = f"{prefix}-"
+        if record_id.startswith(head):
+            tail = record_id[len(head):]
+            if tail.isdigit():
+                return tail
+        return None
+
+    async def reindex_for_user(self, db: AsyncSession, user_id: str) -> int:
+        """Re-embed and re-upsert every live row of this resource for
+        `user_id` into Qdrant, in pages (never one big SELECT). Awaits each
+        index call - unlike the fire-and-forget hook on writes - so the
+        caller (`services.bedrock.knowledge_base.reindex_knowledge_base`)
+        knows when it's done. Returns the number of rows reindexed. A no-op
+        for resources without a `resource_key` or with `vectorize=False`."""
+        if not self.resource_key or not self.vectorize:
+            return 0
+        from services import qdrant_service
+
+        total = 0
+        seen_ids: list = []
+        skip = 0
+        batch = 100
+        while True:
+            rows = await self.list_for_user(db, user_id, skip=skip, limit=batch)
+            if not rows:
+                break
+            for row in rows:
+                await self._index_for_search(row, user_id)
+                seen_ids.append(row.id)
+                total += 1
+            if len(rows) < batch:
+                break
+            skip += batch
+        # Rebuild semantics: drop points for rows that no longer exist in PG
+        # (deleted rows whose best-effort delete hook never reached Qdrant).
+        await qdrant_service.prune_stale_points(user_id, self.resource_key, seen_ids)
+        return total
+
     async def _index_for_search(self, obj: ModelType, user_id: str) -> None:
         """Best-effort: (re)index this record in Qdrant for Agent Bedrock's
         knowledge base. Never lets an indexing failure fail the real write -
@@ -474,7 +527,13 @@ class CareerRepository(Generic[ModelType]):
             resource_type = "methodology" if self.resource_key == "operational-methodologies" else "career_record"
             extra_payload = None
             if resource_type == "methodology":
-                extra_payload = {"agent_profile_ids": getattr(obj, "agent_profile_ids", None) or []}
+                # `title`/`section` en el payload → `search type=methodology`
+                # arma extractos sin re-parsear el markdown (spec 003 RF-016).
+                extra_payload = {
+                    "agent_profile_ids": getattr(obj, "agent_profile_ids", None) or [],
+                    "title": getattr(obj, "title", None),
+                    "section": getattr(obj, "section", None),
+                }
             await qdrant_service.upsert_point(
                 user_id=user_id,
                 resource_type=resource_type,
@@ -483,6 +542,7 @@ class CareerRepository(Generic[ModelType]):
                 text=text,
                 vector=vector,
                 extra_payload=extra_payload,
+                legacy_record_id=self._legacy_record_id(obj.id),
             )
         except Exception as exc:
             logger.warning(

@@ -2237,7 +2237,13 @@ flowchart TD
 
 ### Recibe
 
-`result: dict`.
+`result: dict`, `limit: int | None = None`. `limit` por defecto =
+`BEDROCK_MAX_TOOL_RESULT_CHARS` (8000). `execute_tool` pasa
+`BEDROCK_MAX_METHODOLOGY_RESULT_CHARS` (24000) cuando la llamada es
+`get_career_record` sobre `operational-methodologies` — leer una metodología entera vale
+su coste (spec 003 Bloque J). `search_knowledge_base type=methodology` NO llega aquí con
+texto grande: devuelve extractos (`_methodology_snippet`, `excerpt` ≤ 800 chars) para que
+el agente elija cuál leer entera.
 
 ### Entrega
 

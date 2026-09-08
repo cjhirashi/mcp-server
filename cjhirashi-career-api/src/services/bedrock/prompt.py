@@ -118,7 +118,11 @@ def methodology_assignment_block(
         lines.append(
             "Antes de operar una tabla o protocolo, llama search_knowledge_base "
             "con type=methodology. La tool ya filtra a las asignadas a tu perfil "
-            "(el guardián ve todas). Si el catálogo trae una metodología nueva, consúltala: es tuya."
+            "(el guardián ve todas) y devuelve EXTRACTOS, no el texto completo. "
+            "Identifica cuál aplica a ESTE trabajo y léela entera con get_career_record "
+            "(resource_key=operational-methodologies, record_id=...). Lee sólo la que vas "
+            "a aplicar ahora — una por trabajo, no todas las asignadas. Si el catálogo "
+            "trae una metodología nueva, consúltala: es tuya."
         )
     else:
         lines.append(

@@ -292,6 +292,14 @@ class BedrockToolCatalogResponse(BaseModel):
     mcp: List[BedrockCustomToolResponse]
 
 
+class BedrockKnowledgeBaseReindexResult(BaseModel):
+    """Resultado de `POST /bedrock/knowledge-base/reindex` (spec 003, RF-012)."""
+
+    reindexed: Dict[str, int]
+    purged_orphans: int
+    users: int
+
+
 # ============================================================================
 # Memoria — respuestas y solicitudes
 # ============================================================================

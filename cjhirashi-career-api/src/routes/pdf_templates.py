@@ -18,7 +18,7 @@ from models.pdf_output_template import PdfOutputTemplate
 from models.pdf_template_style import PdfTemplateStyle
 from models.user import User
 from repositories.career_repository import CareerRepository
-from routes.career_common import RESOURCE_REGISTRY
+from routes.career_common import register_resource
 from schemas.pdf_template import (
     PdfOutputTemplateCreate,
     PdfOutputTemplateResponse,
@@ -37,8 +37,8 @@ router = APIRouter(prefix="/pdf-templates", tags=["PDF Templates"])
 
 _repo = CareerRepository(PdfOutputTemplate, resource_key="pdf-output-templates", vectorize=False)
 _style_repo = CareerRepository(PdfTemplateStyle, resource_key="pdf-template-styles", vectorize=False)
-RESOURCE_REGISTRY["pdf-output-templates"] = PdfOutputTemplate
-RESOURCE_REGISTRY["pdf-template-styles"] = PdfTemplateStyle
+register_resource("pdf-output-templates", PdfOutputTemplate, vectorize=False)
+register_resource("pdf-template-styles", PdfTemplateStyle, vectorize=False)
 
 
 async def _normalize_style_id(

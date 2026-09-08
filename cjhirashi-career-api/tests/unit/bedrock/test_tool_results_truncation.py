@@ -76,3 +76,29 @@ def test_list_shaped_result_is_not_field_capped(monkeypatch):
 
     assert out["truncated"] is True
     assert "preview" in out
+
+
+import pytest
+
+
+@pytest.mark.requisito("RF-017")
+def test_explicit_limit_overrides_global_setting(monkeypatch):
+    """Un `limit` explícito manda sobre BEDROCK_MAX_TOOL_RESULT_CHARS."""
+    monkeypatch.setattr(settings, "BEDROCK_MAX_TOOL_RESULT_CHARS", 8000)
+    big = {"item": {"id": "opm-61", "content": "X" * 15000}}
+
+    # Con el tope global se recorta.
+    capped = truncate_tool_result(big)
+    assert len(capped["item"]["content"]) < 15000
+
+    # Con un limit de 24000 cabe entero.
+    whole = truncate_tool_result(big, limit=24000)
+    assert whole["item"]["content"] == "X" * 15000
+    assert _len(whole) <= 24000
+
+
+@pytest.mark.requisito("RF-017")
+def test_limit_none_uses_global_setting(monkeypatch):
+    monkeypatch.setattr(settings, "BEDROCK_MAX_TOOL_RESULT_CHARS", 3000)
+    out = truncate_tool_result({"item": {"id": "p-1", "content": "Y" * 9000}}, limit=None)
+    assert _len(out) <= 3000

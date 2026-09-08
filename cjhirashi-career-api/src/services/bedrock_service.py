@@ -237,6 +237,43 @@ def _normalize_record_id(resource_key: str, record_id: Any) -> str:
     return normalize_prefixed_id(resource_key, record_id)
 
 
+_METHODOLOGY_EXCERPT_CHARS = 800
+
+
+def _methodology_snippet(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Extracto de un acierto de `search_knowledge_base type=methodology`:
+    lo justo para que el agente decida si ES la que necesita, sin traerse el
+    procedimiento completo (spec 003 Bloque J, RF-016). `title`/`section`
+    vienen en el payload de Qdrant (RF-016); el `excerpt` sale del `text`
+    (producido por `CareerRepository._record_to_text` como líneas `campo:
+    valor`), quitándole las líneas de metadatos del principio."""
+    text = row.get("text") or ""
+    body = text
+    for prefix in ("title:", "section:", "subsection:", "description:", "agent_profile_ids:"):
+        # cada metadato ocupa una línea al principio; salta hasta el cuerpo real
+        while body.lstrip().startswith(prefix):
+            body = body.split("\n", 1)[1] if "\n" in body else ""
+            body = body.lstrip("\n")
+    if body.lstrip().startswith("content:"):
+        body = body.lstrip()[len("content:"):].lstrip()
+    if len(body) > _METHODOLOGY_EXCERPT_CHARS:
+        excerpt = body[: _METHODOLOGY_EXCERPT_CHARS - 1] + "…"
+    else:
+        excerpt = body
+    record_id = row.get("record_id")
+    return {
+        "record_id": record_id,
+        "title": row.get("title"),
+        "section": row.get("section"),
+        "score": row.get("score"),
+        "shared": not (row.get("agent_profile_ids") or []),
+        "excerpt": excerpt,
+        "read_full": (
+            f"get_career_record resource_key=operational-methodologies record_id={record_id}"
+        ),
+    }
+
+
 async def _record_audit(
     db,
     *,
@@ -301,6 +338,20 @@ async def _execute_tool(
                 for row in results
                 if applies_to_agent(row.get("agent_profile_ids"), caller_profile_id)
             ][:top_k]
+            # El agente sólo aplica UNA metodología por trabajo. Devolver el
+            # texto completo de cada acierto (una metodología ≈ varios KB)
+            # revienta el presupuesto de tool-results y le da procedimientos
+            # que no va a usar. Se devuelven EXTRACTOS para que elija, y lee la
+            # elegida entera con get_career_record (spec 003 Bloque J, RF-016).
+            return {
+                "results": [_methodology_snippet(row) for row in results],
+                "instruction": (
+                    "Extractos, no el contenido completo. Identifica cuál aplica a "
+                    "ESTE trabajo y léela entera con get_career_record "
+                    "(resource_key=operational-methodologies, record_id=...). "
+                    "Lee sólo la que vas a aplicar ahora, no todas."
+                ),
+            }
         return {"results": results}
 
     if name == "list_career_record":

@@ -44,6 +44,7 @@ from schemas.bedrock import (
     BedrockGlobalRulesUpdateRequest,
     BedrockInstructionsResponse,
     BedrockInstructionsUpdateRequest,
+    BedrockKnowledgeBaseReindexResult,
     BedrockManualMemoryRequest,
     BedrockMemoryEventResponse,
     BedrockMemoryRecordResponse,
@@ -648,6 +649,31 @@ async def get_tools_catalog(
     builtin = profile_tools.list_builtin_tool_catalog()
     mcp = await bedrock_service.list_custom_tools(db)
     return {"builtin": builtin, "mcp": mcp}
+
+
+@router.post(
+    "/knowledge-base/reindex",
+    response_model=BedrockKnowledgeBaseReindexResult,
+    summary="Reindexa el knowledge base (Qdrant) desde Postgres y purga huérfanos",
+)
+async def reindex_knowledge_base_route(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Operación de mantenimiento del operador (spec 003, RF-012). Síncrona;
+    reindexa a todos los usuarios. Idempotente: se puede reintentar sin
+    efectos secundarios."""
+    from services.bedrock import knowledge_base
+
+    try:
+        return await knowledge_base.reindex_knowledge_base(db, None)
+    except HTTPException:
+        raise
+    except Exception as exc:  # Qdrant/infra caído a media corrida
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Reindexado incompleto (reintentable, es idempotente): {exc}",
+        )
 
 
 @router.post("/tools", response_model=BedrockCustomToolResponse, status_code=status.HTTP_201_CREATED, summary="Register a new MCP tool server")

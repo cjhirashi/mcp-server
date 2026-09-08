@@ -8,6 +8,73 @@ subtipo: history
 > Append-only, orden cronológico inverso (lo más reciente arriba). Una entrada
 > Session-End por sesión, con el formato fijo de `method.md §10`.
 
+## [2026-09-07] 003 (Bloque J) — lectura selectiva de metodologías — verified
+
+- **Fase alcanzada:** verified (mismo hilo, tras Bloque I). RF-016/017/018 + RNF-005.
+- **Rebotes del verificador:** 1 — el extracto salía con `title=None`/`section=None`
+  porque el payload de Qdrant no llevaba esas columnas estructuradas (el `text` empieza
+  en `content:`). Fix: `_index_for_search` añade `title`/`section` al `extra_payload` de
+  las metodologías; `_methodology_snippet` los lee del payload. Requirió re-correr el
+  reindex en vivo para repoblar el payload.
+- **Directiva de Pausa:** no.
+- **Drift / re-anchor:** 2ª reapertura de 003 (mismo día); `anchor_mode` sigue strict.
+- **Anclas movidas:** ninguna todavía (pendiente el commit de cierre).
+- **Gate:** verde (`.harness/gate/check.sh` → 22 ok · 0 warn · 0 error; "003: cobertura
+  completa (18 RF, 0 pendientes)"). API `403 passed, 72 skipped`.
+- **Verificación en vivo (Art. 3, contenedor reconstruido + reindex re-corrido):**
+  `search_knowledge_base type=methodology` (caller `agent_support`, top_k=3) → devuelve
+  `{results, instruction}` con extractos `{record_id, title, section, excerpt≤800, read_full}`
+  y SIN clave `text`; sólo opm-37 (compartida) + opm-56 (asignada), no opm-61 (asignada a
+  `agent_methodologies`, RF-008 sigue). `get_career_record` de `opm-61` → `content` de
+  **15.611 chars, sin marcador de truncado** (tope propio 24000 vs global 8000).
+- **Docs actualizadas:** `docs/BEDROCK-SYSTEM.md` §Knowledge base (patrón buscar→leer +
+  `BEDROCK_MAX_METHODOLOGY_RESULT_CHARS`); `cjhirashi-career-api/src/services/bedrock/README.md`
+  (`truncate_tool_result` gana `limit`; `search type=methodology` = extractos).
+- **Decisiones de diseño:** el agente aplica **una** metodología por trabajo; devolver
+  todas enteras revienta el tope de tool-results (opm-61 15,6k > 8k) y encarece cada
+  turno. `search type=methodology` → extractos (elegir); `get_career_record` sobre
+  `operational-methodologies` → presupuesto propio `BEDROCK_MAX_METHODOLOGY_RESULT_CHARS`
+  = 24000 (D-11/D-12). `truncate_tool_result(result, limit)` acepta tope por llamada;
+  `execute_tool._result_char_limit` lo elige. El prompt guía el flujo (RF-018).
+- **Próximo paso:** el mismo commit de cierre de Bloque I abarca Bloque J (aún sin
+  commitear); mover `anchor_commit` + push.
+
+## [2026-09-07] 003 (reapertura Bloque F) — consistencia del knowledge base — verified
+
+- **Fase alcanzada:** verified (re-anchor sobre 003; RF-010..RF-015 / RNF-003..004 nuevos).
+- **Rebotes del verificador:** 0 (TDD en el mismo hilo).
+- **Directiva de Pausa:** sí — el plan asumía "upsert filas vivas + `purge_orphans`" = RF-010;
+  la verificación en vivo mostró +2 puntos residuales (filas borradas de PG sin propagar +
+  1 punto de `cv-versions`, hoy `vectorize=False`). Solución de raíz sin cambiar el RF:
+  `qdrant_service.prune_stale_points(user_id, resource_key, keep_ids)` por recurso +
+  poda a cero de los recursos no vectorizables. Reflejado en spec §3.6 / plan §1 / tasks T-083/084.
+- **Drift / re-anchor:** re-anchor de 003 — `estado` `verified`→`implementing`→`verified`;
+  `anchor_mode` advisory→strict; `anchor_commit` sigue `c855a19d` (mover al commit de cierre).
+- **Anclas movidas:** ninguna todavía (pendiente el commit de cierre).
+- **Gate:** verde (`.harness/gate/check.sh` → 22 ok · 0 warn · 0 error; "003: cobertura
+  completa (15 RF, 0 pendientes)"). API `394 passed, 72 skipped` (`--no-cov`).
+- **Verificación en vivo (Art. 3, `cjhirashi-career-api` reconstruida + redeployada):**
+  `check_kb_consistency.py` ANTES: usr-2 metodología 23 PG / 7 Qdrant, career_record 260/107,
+  252 huérfanos. `POST /bedrock/knowledge-base/reindex` (JWT real usr-2, HTTP 200, ~68 s):
+  `{"reindexed":{"career_record":265,"methodology":24},"purged_orphans":0,"users":2}`.
+  DESPUÉS: `check_kb_consistency.py` EXIT 0 — 260/260, 23/23, 5/5, 1/1, 0 huérfanos.
+  `search_knowledge_base type=methodology` en vivo por perfil: professional_identity 7
+  (6 propias + opm-37 compartida), pdf_design 3, networking 2 — solo lo asignado + lo
+  compartido, y **ahora sí lo devuelve** (antes ~0).
+- **Docs actualizadas:** `docs/09-DECISIONS/026-configuracion-agentes-app.md` (§Reapertura,
+  D-6..D-10), `docs/BEDROCK-SYSTEM.md` (§Knowledge base: reindexado y consistencia),
+  `cjhirashi-career-api/docs/sections/bedrock/README.md`, `src/services/README.md`,
+  `.harness/specs/003/contracts/knowledge-base.md` (nuevo).
+- **Decisiones de diseño / límites de integración:** causa raíz = índice Qdrant stale por
+  migración de IDs (enteros→`usr-2`/`opm-33`) nunca re-indexada; `_point_id` deriva de
+  `resource_key:record_id` → dos generaciones acumuladas; `search` filtra `user_id` exacto.
+  Fix = `reindex_knowledge_base` idempotente + endpoint de operador (rebuild real:
+  upsert filas vivas + `prune_stale_points` + poda de no-vectorizables + `purge_orphans`);
+  `_index_for_search` borra el gemelo heredado en cada upsert (RF-013); `RESOURCE_VECTORIZE`
+  vía `register_resource` = fuente única; `set_agent_methodologies` fuerza reindex (RF-014).
+- **Próximo paso:** commit de cierre en `main` + mover `anchor_commit` de 003 a ese commit +
+  `git push`. Ejecutar `check_kb_consistency.py` tras cualquier migración futura de ids/`user_id`.
+
 ## [2026-09-06] 003-configuracion-agentes-desde-app — verified
 
 - **Fase alcanzada:** verified.

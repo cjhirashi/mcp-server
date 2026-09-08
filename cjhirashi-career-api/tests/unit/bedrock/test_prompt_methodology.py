@@ -161,3 +161,28 @@ async def test_compose_injects_assigned_catalog(monkeypatch):
     assert "SOLO las metodologías operativas asignadas a tu perfil" in composed
     assert "Prefiere tono directo" in composed
     assert "MEMORIA PROPIA" in composed
+
+
+@pytest.mark.requisito("RF-018")
+def test_block_guides_search_then_read_one_methodology():
+    """El bloque instruye buscar→leer: extractos con search, la metodología
+    que aplica se lee entera con get_career_record, una por trabajo."""
+    profile = get_profile(AGENT_PROFESSIONAL_IDENTITY)
+    assert profile_can_search_knowledge(profile)
+    block = methodology_assignment_block(
+        profile, [{"id": "opm-1", "title": "Proceso 1", "section": "Identidad"}]
+    )
+    low = block.lower()
+    assert "search_knowledge_base" in block
+    assert "get_career_record" in block
+    assert "extracto" in low  # devuelve extractos, no el contenido completo
+    # "una por trabajo, no todas"
+    assert "no todas" in low or "una por trabajo" in low
+
+
+@pytest.mark.requisito("RF-018")
+def test_block_without_search_tool_unchanged_guidance():
+    profile = get_profile(AGENT_PDF_RENDER)  # L3 sin search_knowledge_base
+    assert not profile_can_search_knowledge(profile)
+    block = methodology_assignment_block(profile, [])
+    assert "No tienes search_knowledge_base" in block
